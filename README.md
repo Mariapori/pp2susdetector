@@ -81,10 +81,6 @@ pp2:
   chatlog_path: "/etc/pp2host/static/chatlog.txt"
   playlog_path: "/etc/pp2host/static/playlog.txt"
   
-llm:
-  provider: "openai"
-  model: "gpt-4o-mini"
-  
 discord:
   enabled: true
   
