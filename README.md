@@ -2,7 +2,7 @@
 
 Prototyyppi hahmoteltu ja testailtu Google AntiGravityn avulla.
 
-Sovellus joka valvoo PP2 (Pro Pilkki 2) host serverin lokia reaaliaikaisesti ja analysoi pelaajien käyttäytymistä LLM:n (OpenAI) avulla. Rikkomukset kategorisoidaan vakavuuden mukaan ja raportoidaan Discord-kanavalle.
+Sovellus joka valvoo PP2 (Pro Pilkki 2) host serverin lokia reaaliaikaisesti ja analysoi pelaajien käyttäytymistä ML:n avulla. Rikkomukset kategorisoidaan vakavuuden mukaan ja raportoidaan Discord-kanavalle.
 
 ## Ominaisuudet
 
