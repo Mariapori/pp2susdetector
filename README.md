@@ -18,7 +18,7 @@ Sovellus joka valvoo PP2 (Pro Pilkki 2) host serverin lokia reaaliaikaisesti ja 
 
 ## Vaatimukset
 
-- Docker ja Docker Compose
+- Docker ja Docker Compose (Valinnainen)
 - Discord webhook URL
 
 ## Asennus
