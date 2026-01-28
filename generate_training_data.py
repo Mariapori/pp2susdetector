@@ -1,3 +1,5 @@
+# VAROITUS, TÄMÄ SISÄLTÖ ON OPETUSDATAA!!!
+# TÄMÄN EI OLE TARKOITUS LOUKATA KETÄÄN
 import pandas as pd
 import random
 import os
