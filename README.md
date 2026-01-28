@@ -109,7 +109,7 @@ Vakavat ja keskivakavat rikkomukset lähetetään Discordiin. Ilmoitus sisältä
 - Pelaajan nimen
 - IP-osoitteen
 - Rikkomuksen sisällön
-- LLM:n perustelun
+- ML:n perustelun
 - Ehdotetun toimenpiteen
 - Valmiin ban-komennon (vakavissa tapauksissa)
 
