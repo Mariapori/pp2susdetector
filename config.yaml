@@ -1,0 +1,37 @@
+# PP2 Configuration
+pp2:
+  # Polut lokitiedostoihin. 
+  # Dockerissa esim: "/etc/pp2host/static/chatlog.txt"
+  # Paikallisesti esim: "C:/PP2/static/chatlog.txt" tai "/Users/username/PP2/chatlog.txt"
+  chatlog_path: "/etc/pp2host/static/chatlog.txt"
+  playlog_path: "/etc/pp2host/static/playlog.txt"
+  
+  # Docker-kontin nimi, josta salasana etsitään automaattisesti (vain jos docker on asennettu)
+  container_name: "pp2host"
+  
+  # PP2 Admin Panel URL. Jos ajat paikallisesti, tämä on yleensä localhost tai 127.0.0.1
+  admin_url: "http://localhost:4500/Admin.html"
+  admin_user: "admin"
+  # admin_password: "MANUAL_PASSWORD_HERE" # Voit asettaa tässä tai .env tiedostossa
+
+ml:
+  # Mallin polku
+  model_path: "models/violation_model.joblib"
+  
+discord:
+  enabled: true
+  verify_all: true
+  
+rules:
+  severe:
+    - "Epäsiveelliset nikit"
+    - "Rasistinen puhe"
+    - "Vakava solvaaminen"
+    - "Sotapropaganda"
+  moderate:
+    - "Sopimaton nikki"
+    - "Kiroilu päiväsaikaan"
+    - "Jatkuva lokitus"
+  minor:
+    - "Epäselvät tapaukset"
+    - "Lievä epäkohteliaisuus"

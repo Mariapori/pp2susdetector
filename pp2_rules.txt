@@ -1,0 +1,35 @@
+# PP2 Julkisen Hostin Säännöt
+
+## Julkisella hostilla pelaaminen
+
+- Älä käytä sopimatonta nikkiä, epäsiveelliset, rasistiset, julkisten nimet jne. johtavat varoitukseen ja pyyntöön nikin vaihtamisesta
+- Hyvä nikki on esim. oma nimi (-heikki-)
+- Nikkinä ei myös käy kirosanat
+- Tiimitagi pitää olla sopiva, esim. [TKN]
+- Maatunnuksena vain oma maa, esim. [FI] tai [FIN], ei mitään olemattomia maatunnuksia
+- Opettele perusasiat ennen verkkopeliin tulemista, hyvät käytöstavat myös
+- Älä ilmoita jokaista saamaasi kalaa, perussääntö: yli 100g kiisket ja yli kiloiset muut kalat voi jo kertoakkin
+- Keskustelussa tulee olla kohtelias toisille pelaajille, kaikenlainen toisen pelaajan morkkaaminen on kiellettyä
+- Hostilla ei ole kenelläkään ns. varattuja paikkoja, eli ensimmäisen reiän voi tehdä kenen viereen tahansa
+- Kaikki pelaajat on tasavertaisia. Kohtele toista pelaajaa niinkuin haluat itseäsi kohdeltavan
+- Keskusteluissa on kiellettyä uskonnolliset ja poliittiset julistukset
+- Kiroilua tulee välttää, päiväsaikaan on paljon lapsiakin pelaamassa
+- Pelaajien nikit ja ip talentuvat pelin logiin. Myös kaikki yleisellä käydyt keskustelut tallentuvat
+- Ethän jää punnalle ellei mappi kiinnosta
+- Pidetään peli siistinä niin kaikkien on mukava pelata
+
+## Seuraamukset
+
+- /mute N - Pelaaja voidaan mykistää, jolloin pelaajan viestit ei näy yleisessä chatissa
+- /kick N 0 - Pelaajalle tulee 0 min banni, esim punnalle jäämisestä ruuhka aikaan
+- /kick N - Pelaajalle tulee 5 min banni, esim, sopimaton nikki ja ei suostu vaihtamaan
+- /kick N 10-30 - Pelaajalle tulee 10-30 min banni, esim jatkuva lokitus
+- /kick N 9999999 - Pelaajalle tulee pitkä banni, esim, erittäin sopimaton käytös, solvaaminen, epäsiveellinen nikki jne
+- /banaddress IP 9999999 - IP-osoitteen banni pitkäksi aikaa
+
+## Adminit
+
+- Annetaan pelaajalle ensin varoitus, sopimaton nikki, -käytös, jatkuva lokitus
+- Erittäin räikeissä tapauksissa toimitaan oman harkinnan mukaan
+- Jos riittää /mute niin käytetään sitä
+- Adminit yrittävät opastaa uusia pelaajia kykyjensä mukaan
