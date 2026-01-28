@@ -7,7 +7,7 @@ Sovellus joka valvoo PP2 (Pro Pilkki 2) host serverin lokia reaaliaikaisesti ja 
 ## Ominaisuudet
 
 - 🎣 **Reaaliaikainen valvonta**: Seuraa PP2 hostin chat- ja pelaajalokeja
-- 🤖 **LLM-analyysi**: Käyttää OpenAI GPT-4o-mini -mallia rikkomusten havaitsemiseen
+- 🤖 **ML-analyysi**
 - 📊 **Kolme vakavuustasoa**:
   - 🚨 **SEVERE**: Vakavat rikkomukset (rasismi, sotapropaganda, epäsiveellisyys)
   - ⚠️ **MODERATE**: Keskivakavat rikkomukset (kiroilu, lokitus)
@@ -19,8 +19,7 @@ Sovellus joka valvoo PP2 (Pro Pilkki 2) host serverin lokia reaaliaikaisesti ja 
 ## Vaatimukset
 
 - Docker ja Docker Compose
-- OpenAI API-avain
-- Discord webhook URL (valinnainen)
+- Discord webhook URL
 
 ## Asennus
 
@@ -36,7 +35,6 @@ cp .env.example .env
 
 3. **Muokkaa `.env` tiedostoa**:
 ```env
-OPENAI_API_KEY=sk-your-openai-api-key-here
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your-webhook-url
 ```
 
@@ -151,14 +149,6 @@ Voit ajaa detectoria suoraan Pythonilla, vaikka PP2-hosti ei olisi Dockerissa.
 
 ## Tietoturva
 
-- OpenAI API-avain ja Discord webhook URL tallennetaan `.env` tiedostoon (ei versionhallinnassa)
+- Discord webhook URL tallennetaan `.env` tiedostoon (ei versionhallinnassa)
 - Lokitiedostot ovat read-only detectorille
 - Tietokanta tallennetaan paikallisesti `data/` kansioon
-
-## Lisenssi
-
-Tämä on henkilökohtainen projekti PP2 pelin moderointiin.
-
-## Tekijä
-
-Topias Mariapori
