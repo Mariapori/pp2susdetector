@@ -128,7 +128,7 @@ Voit ajaa detectoria suoraan Pythonilla, vaikka PP2-hosti ei olisi Dockerissa.
    ```
 
 3. **Määritä asetukset**:
-   - Luo `.env` tiedosto (`cp .env.example .env`) ja aseta `OPENAI_API_KEY`, `DISCORD_WEBHOOK_URL` jne.
+   - Luo `.env` tiedosto (`cp .env.example .env`) ja aseta `DISCORD_WEBHOOK_URL` jne.
    - **Tärkeää**: Aseta `ADMIN_PASSWORD` `.env` tiedostoon, sillä automaattinen salasanan haku toimii vain Dockerissa.
    - Muokkaa `config.yaml` tiedostoa ja aseta oikeat polut:
      ```yaml
