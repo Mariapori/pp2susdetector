@@ -71,32 +71,33 @@ def generate_nsfw_dataset():
         nick = random.choice(nick_types)
         data.append({"text": nick.replace(",", ""), "label": "SEVERE"})
 
-    # Load existing data to merge and keep balance
-    if os.path.exists("data/training_data.csv"):
+    new_df = pd.DataFrame(data)
+    data_file = "data/training_data.csv"
+
+    if os.path.exists(data_file):
         try:
-            # Use on_bad_lines='skip' to handle corrupted CSV entries
-            existing_df = pd.read_csv("data/training_data.csv", on_bad_lines='skip')
-            # Filter out any weirdly formatted labels if they slipped through
-            valid_labels = ["OK", "MINOR", "MODERATE", "SEVERE"]
-            existing_df = existing_df[existing_df['label'].isin(valid_labels)]
-            
-            other_data = existing_df[existing_df['label'] != 'SEVERE']
-            # Balance by adding existing non-severe data 
-            for _ in range(3):
-                 data.extend(other_data.to_dict('records'))
-                 
-            # Add existing SEVERE data
-            severe_existing = existing_df[existing_df['label'] == 'SEVERE']
-            data.extend(severe_existing.to_dict('records'))
+            existing_df = pd.read_csv(data_file, on_bad_lines='skip')
+            # Merge new data with existing
+            df = pd.concat([existing_df, new_df], ignore_index=True)
+            print(f"Merged {len(new_df)} new samples with {len(existing_df)} existing samples.")
         except Exception as e:
             print(f"⚠️ Warning: Could not read existing training data: {e}")
+            df = new_df
+    else:
+        df = new_df
 
-    df = pd.DataFrame(data)
+    # Remove duplicates - this is CRITICAL to fix previous exponential growth
+    initial_count = len(df)
+    df = df.drop_duplicates(subset=['text', 'label'])
+    removed = initial_count - len(df)
+    if removed > 0:
+        print(f"🗑️ Removed {removed} duplicate rows.")
+
     df = df.sample(frac=1).reset_index(drop=True)
     
     os.makedirs("data", exist_ok=True)
-    df.to_csv("data/training_data.csv", index=False)
-    print(f"Generated expanded dataset with {len(df)} samples saved to data/training_data.csv")
+    df.to_csv(data_file, index=False)
+    print(f"Generated expanded dataset. Total samples: {len(df)} saved to {data_file}")
 
 if __name__ == "__main__":
     generate_nsfw_dataset()

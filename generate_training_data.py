@@ -79,12 +79,28 @@ def generate_dataset():
         for msg in severe_violations: data.append({"text": msg.replace(",", ""), "label": "SEVERE"})
         for nick in severe_nicknames: data.append({"text": nick.replace(",", ""), "label": "SEVERE"})
 
-    df = pd.DataFrame(data)
-    df = df.sample(frac=1).reset_index(drop=True)
+    new_df = pd.DataFrame(data)
     
     os.makedirs("data", exist_ok=True)
-    df.to_csv("data/training_data.csv", index=False)
-    print(f"Generated dataset with {len(df)} samples saved to data/training_data.csv")
+    data_file = "data/training_data.csv"
+    
+    if os.path.exists(data_file):
+        try:
+            existing_df = pd.read_csv(data_file, on_bad_lines='skip')
+            df = pd.concat([existing_df, new_df], ignore_index=True)
+            print(f"Merged {len(new_df)} new samples with {len(existing_df)} existing samples.")
+        except Exception as e:
+            print(f"⚠️ Warning: Could not read existing data, starting fresh: {e}")
+            df = new_df
+    else:
+        df = new_df
+
+    # Remove duplicates to avoid bloat
+    df = df.drop_duplicates(subset=['text', 'label'])
+    df = df.sample(frac=1).reset_index(drop=True)
+    
+    df.to_csv(data_file, index=False)
+    print(f"Dataset updated. Total samples: {len(df)} saved to {data_file}")
 
 if __name__ == "__main__":
     generate_dataset()
