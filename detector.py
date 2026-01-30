@@ -53,8 +53,12 @@ class PP2Detector:
             discord_bot=self.discord_bot
         )
         
+        # Store config path for updates
+        self.config_path = config_path
+        
         if self.discord_bot:
             self.discord_bot.set_command_callback(self.action_handler.execute_command)
+            self.discord_bot.set_config_callback(self._handle_config_update)
         
         Path("data").mkdir(exist_ok=True)
         self.db = Database("data/violations.db")
@@ -105,6 +109,36 @@ class PP2Detector:
                 time.sleep(retry_delay)
         
         return None
+    
+    def _handle_config_update(self, action: str, value: Optional[bool]) -> bool:
+        """Handle config updates from Discord commands"""
+        if action == "get":
+            # Return current verify_all value
+            return self.config.get('discord', {}).get('verify_all', False)
+        elif action == "set":
+            try:
+                # Update in-memory config
+                if 'discord' not in self.config:
+                    self.config['discord'] = {}
+                self.config['discord']['verify_all'] = value
+                
+                # Save to config file
+                with open(self.config_path, 'r', encoding='utf-8') as f:
+                    full_config = yaml.safe_load(f)
+                
+                if 'discord' not in full_config:
+                    full_config['discord'] = {}
+                full_config['discord']['verify_all'] = value
+                
+                with open(self.config_path, 'w', encoding='utf-8') as f:
+                    yaml.dump(full_config, f, default_flow_style=False, allow_unicode=True)
+                
+                log.info(f"🔧 verify_all asetettu: {value}")
+                return True
+            except Exception as e:
+                log.error(f"❌ Virhe config-päivityksessä: {e}")
+                return False
+        return False
     
     def process_chat_message(self, message: ChatMessage, player_ip: str = None, ban_command: str = None, name_with_ids: str = None):
         msg_id = f"{message.timestamp}:{message.player_name}:{message.message}"

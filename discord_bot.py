@@ -5,6 +5,7 @@ import asyncio
 import threading
 import subprocess
 import sys
+import yaml
 from typing import Optional, Callable, Dict, Any
 from logger import log
 
@@ -62,6 +63,7 @@ class DiscordBot:
         self.token = token
         self.channel_id = int(channel_id) if channel_id else None
         self.cmd_callback = None # Set later
+        self.config_callback = None  # Callback for config updates
         
         # We need message_content to read !c commands
         # If this fails, recommend the user to enable it in the portal
@@ -152,9 +154,48 @@ class DiscordBot:
                 except:
                     pass
 
+        @self.bot.command(name="verify")
+        async def toggle_verify_all(ctx, mode: str = None):
+            """Säädä verify_all asetusta: !verify on/off/status"""
+            if not self.config_callback:
+                await ctx.send("❌ Config-callback ei ole käytössä.")
+                return
+            
+            if mode is None or mode.lower() == "status":
+                # Show current status
+                current = self.config_callback("get", None)
+                status_emoji = "✅" if current else "❌"
+                await ctx.send(f"📋 **verify_all** on tällä hetkellä: {status_emoji} **{'päällä' if current else 'pois päältä'}**")
+                return
+            
+            mode_lower = mode.lower()
+            if mode_lower in ["on", "true", "1", "päällä"]:
+                new_value = True
+            elif mode_lower in ["off", "false", "0", "pois"]:
+                new_value = False
+            else:
+                await ctx.send("❌ Käyttö: `!verify on` tai `!verify off` tai `!verify status`")
+                return
+            
+            try:
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(None, self.config_callback, "set", new_value)
+                
+                if result:
+                    status_emoji = "✅" if new_value else "❌"
+                    await ctx.send(f"🔧 **verify_all** asetettu: {status_emoji} **{'päällä' if new_value else 'pois päältä'}**\n*Muutos on voimassa heti.*")
+                else:
+                    await ctx.send("❌ Asetuksen muuttaminen epäonnistui.")
+            except Exception as e:
+                await ctx.send(f"❌ Virhe: {str(e)}")
+
     def set_command_callback(self, callback: Callable[[str], None]):
         """Set the function to call when a PP2 command needs to be executed"""
         self.cmd_callback = callback
+
+    def set_config_callback(self, callback: Callable[[str, Optional[bool]], bool]):
+        """Set the function to call when config needs to be read or updated"""
+        self.config_callback = callback
 
     async def send_interaction(self, embed_data: Dict[str, Any], callback_confirm: Callable, callback_reject: Callable):
         """Send a message with interactive buttons"""
