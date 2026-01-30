@@ -155,8 +155,13 @@ class ActionHandler:
         log.info(f"🚀 Suoritetaan PP2-komento ({pp2_admin_url}): {command}")
         try:
             from requests.auth import HTTPBasicAuth
+            # Force CP1252 encoding for legacy server support
+            import urllib.parse
+            encoded_command = urllib.parse.quote(command, encoding='cp1252')
+            payload = f"c={encoded_command}"
+
             response = requests.post(
-                pp2_admin_url, data={'c': command},
+                pp2_admin_url, data=payload,
                 auth=HTTPBasicAuth(pp2_admin_user, pp2_admin_password),
                 headers={'Content-Type': 'application/x-www-form-urlencoded', 'Referer': pp2_admin_url},
                 timeout=10
