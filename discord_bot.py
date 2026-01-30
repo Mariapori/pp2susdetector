@@ -6,6 +6,7 @@ import threading
 import subprocess
 import sys
 from typing import Optional, Callable, Dict, Any
+from logger import log
 
 class SeveritySelect(ui.Select):
     """Dropdown menu for selecting violation severity"""
@@ -69,7 +70,7 @@ class DiscordBot:
             intents.message_content = True
             self.bot = commands.Bot(command_prefix="!", intents=intents)
         except Exception as e:
-            print(f"⚠️ Alustuksessa tapahtui virhe: {e}")
+            log.warning(f"⚠️ Alustuksessa tapahtui virhe: {e}")
             intents = discord.Intents.default()
             self.bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -77,7 +78,7 @@ class DiscordBot:
         
         @self.bot.event
         async def on_ready():
-            print(f"🤖 Discord Bot kirjautunut sisään: {self.bot.user}")
+            log.info(f"🤖 Discord Bot kirjautunut sisään: {self.bot.user}")
             self.is_ready = True
 
         @self.bot.command(name="c")
@@ -158,7 +159,7 @@ class DiscordBot:
     async def send_interaction(self, embed_data: Dict[str, Any], callback_confirm: Callable, callback_reject: Callable):
         """Send a message with interactive buttons"""
         if not self.is_ready:
-            print("⚠️ Discord Bot ei ole valmis, interaktiivista viestiä ei voitu lähettää")
+            log.warning("⚠️ Discord Bot ei ole valmis, interaktiivista viestiä ei voitu lähettää")
             return
 
         channel = None
@@ -173,7 +174,7 @@ class DiscordBot:
                 if channel: break
         
         if not channel:
-            print("⚠️ Kanavaa ei löytynyt interaktiivisen viestin lähettämiseen")
+            log.warning("⚠️ Kanavaa ei löytynyt interaktiivisen viestin lähettämiseen")
             return
 
         embed = discord.Embed(
@@ -196,13 +197,13 @@ class DiscordBot:
             try:
                 loop.run_until_complete(self.bot.start(self.token))
             except discord.errors.PrivilegedIntentsRequired:
-                print("\n❌ VIRHE: Discord-botti vaatii 'Message Content Intent' -oikeuden.")
-                print("1. Mene osoitteeseen: https://discord.com/developers/applications/")
-                print("2. Valitse sovelluksesi -> Bot")
-                print("3. Ota käyttöön: 'Message Content Intent'")
-                print("4. Tallenna muutokset ja käynnistä detector uudelleen.\n")
+                log.error("❌ VIRHE: Discord-botti vaatii 'Message Content Intent' -oikeuden.")
+                log.error("1. Mene osoitteeseen: https://discord.com/developers/applications/")
+                log.error("2. Valitse sovelluksesi -> Bot")
+                log.error("3. Ota käyttöön: 'Message Content Intent'")
+                log.error("4. Tallenna muutokset ja käynnistä detector uudelleen.")
             except Exception as e:
-                print(f"❌ Odottamaton virhe Discord-botin käynnistyksessä: {e}")
+                log.error(f"❌ Odottamaton virhe Discord-botin käynnistyksessä: {e}")
         
         thread = threading.Thread(target=run, daemon=True)
         thread.start()

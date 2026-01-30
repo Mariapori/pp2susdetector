@@ -16,6 +16,7 @@ from ml_analyzer import MLAnalyzer
 from action_handler import ActionHandler
 from discord_bot import DiscordBot
 from database import Database
+from logger import log
 
 
 class PP2Detector:
@@ -36,7 +37,7 @@ class PP2Detector:
         self.discord_bot = None
         bot_token = os.getenv("DISCORD_BOT_TOKEN")
         if bot_token:
-            print("🤖 Alustetaan Discord-botti...")
+            log.info("🤖 Alustetaan Discord-botti...")
             self.discord_bot = DiscordBot(bot_token)
 
         pp2_admin_password = os.getenv('ADMIN_PASSWORD') or self.config['pp2'].get('admin_password')
@@ -62,15 +63,15 @@ class PP2Detector:
         self.processed_players = set()
         self.player_sessions = {}
         
-        print("✅ Detector alustettu")
+        log.info("✅ Detector alustettu")
 
     def _discover_admin_password(self) -> Optional[str]:
-        print("🔍 Etsitään admin-salasanaa...")
+        log.info("🔍 Etsitään admin-salasanaa...")
         
         try:
             import docker
         except ImportError:
-            print("⚠️ 'docker' kirjastoa ei ole asennettu. Ohitetaan automaattinen salasanan etsintä.")
+            log.warning("⚠️ 'docker' kirjastoa ei ole asennettu. Ohitetaan automaattinen salasanan etsintä.")
             return None
 
         max_retries = 5 # Reduced retries for local execution if docker is present but fails
@@ -90,17 +91,17 @@ class PP2Detector:
                     logs = container.logs().decode('utf-8')
                     match = re.search(r"Generated password: (\w+)", logs)
                     if match:
-                        print(f"✅ Admin-salasana löytyi Docker-kontista '{container_name}'")
+                        log.info(f"✅ Admin-salasana löytyi Docker-kontista '{container_name}'")
                         return match.group(1).strip()
                 except Exception as e:
-                    print(f"⚠️ Konttia '{container_name}' ei löytynyt tai lokien luku epäonnistui: {e}")
+                    log.warning(f"⚠️ Konttia '{container_name}' ei löytynyt tai lokien luku epäonnistui: {e}")
                     # If the container isn't found, we can't really retry successfully unless it's starting up
                 
             except Exception as e:
-                print(f"⚠️ Docker-virhe: {e}")
+                log.warning(f"⚠️ Docker-virhe: {e}")
             
             if i < max_retries - 1:
-                print(f"🔄 Yritetään uudelleen {retry_delay}s kuluttua ({i+1}/{max_retries})...")
+                log.info(f"🔄 Yritetään uudelleen {retry_delay}s kuluttua ({i+1}/{max_retries})...")
                 time.sleep(retry_delay)
         
         return None
@@ -125,7 +126,7 @@ class PP2Detector:
             return
 
         self.processed_messages.add(msg_id)
-        print(f"📨 Analysoidaan viesti ({message.player_name}): {message.message[:100]}")
+        log.info(f"📨 Analysoidaan viesti ({message.player_name}): {message.message[:100]}")
         
         analysis = self.analyzer.analyze_message(message.player_name, message.message)
         
@@ -135,7 +136,7 @@ class PP2Detector:
         if analysis.level != "OK" or verify_all:
             if analysis.level == "OK" and verify_all:
                 # Force verification for OK messages if verify_all is enabled
-                print(f"🔍 Tarkastetaan viesti (verify_all): {message.message[:100]}")
+                log.info(f"🔍 Tarkastetaan viesti (verify_all): {message.message[:100]}")
                 # We use a special internal state or just MODERATE to trigger the UI
                 # But we want to preserve the fact that ML thought it was OK
                 analysis.reason = "Manuaalinen tarkastus (kaikki viestit)"
@@ -144,7 +145,7 @@ class PP2Detector:
                 if analysis.level == "OK":
                     analysis.level = "MINOR" 
             
-            print(f"🚨 RIKKOMUS TAI TARKASTUS HAVAITTU: {analysis.level}")
+            log.warning(f"🚨 RIKKOMUS TAI TARKASTUS HAVAITTU: {analysis.level}")
             self.db.add_violation(
                 timestamp=message.timestamp, player_name=message.player_name,
                 violation_type="message", content=message.message,
@@ -166,10 +167,10 @@ class PP2Detector:
         if player_id in self.processed_players: return
         self.processed_players.add(player_id)
         
-        print(f"👤 Analysoidaan nimimerkki: {join_event.player_name} ({join_event.ip_address})")
+        log.info(f"👤 Analysoidaan nimimerkki: {join_event.player_name} ({join_event.ip_address})")
         analysis = self.analyzer.analyze_nickname(join_event.player_name)
         if analysis.level != "OK":
-            print(f"🚨 NIMITASON RIKKOMUS: {analysis.level}")
+            log.warning(f"🚨 NIMITASON RIKKOMUS: {analysis.level}")
             self.db.add_violation(
                 timestamp=join_event.timestamp, player_name=join_event.player_name,
                 violation_type="nickname", content=join_event.player_name,
@@ -184,10 +185,10 @@ class PP2Detector:
     def tail_file(self, filepath: str, label: str, start_at_end: bool = True):
         """Tail a file and yield new lines with heartbeat"""
         if not os.path.exists(filepath):
-            print(f"🛑 Tiedostoa ei löydy: {filepath}")
+            log.error(f"🛑 Tiedostoa ei löydy: {filepath}")
             return
             
-        print(f"📖 Aloitetaan seuranta ({label}): {filepath} (alusta: {not start_at_end})")
+        log.info(f"📖 Aloitetaan seuranta ({label}): {filepath} (alusta: {not start_at_end})")
         
         pos = 0
         if start_at_end:
@@ -199,7 +200,7 @@ class PP2Detector:
             try:
                 current_size = os.path.getsize(filepath)
                 if current_size < pos:
-                    print(f"🔄 Tiedosto muuttunut merkittävästi ({label}), resetoidaan indeksi.")
+                    log.info(f"🔄 Tiedosto muuttunut merkittävästi ({label}), resetoidaan indeksi.")
                     pos = 0
 
                 # Try to read the file. PP2 logs are usually CP1252 or UTF-8.
@@ -232,7 +233,7 @@ class PP2Detector:
                 # Heartbeat and sleep logic
                 current_size = os.path.getsize(filepath) # Re-get current size after reading
                 if time.time() - last_heartbeat > 120:
-                    print(f"💓 Seuranta käynnissä ({label}) - Pos: {pos}, Size: {current_size}")
+                    log.debug(f"💓 Seuranta käynnissä ({label}) - Pos: {pos}, Size: {current_size}")
                     last_heartbeat = time.time()
                 
                 time.sleep(1)
@@ -240,12 +241,12 @@ class PP2Detector:
                 if os.path.getsize(filepath) != current_size:
                     continue # File changed, re-enter outer loop to re-evaluate size and open
             except Exception as e:
-                print(f"❌ Virhe tiedoston {label} luvussa: {e}")
+                log.error(f"❌ Virhe tiedoston {label} luvussa: {e}")
                 time.sleep(5)
 
     def monitor_chatlog(self):
         chatlog_path = self.config['pp2']['chatlog_path']
-        print(f"\n👀 Valvotaan chat-lokia: {chatlog_path}")
+        log.info(f"👀 Valvotaan chat-lokia: {chatlog_path}")
         
         pending_name_line = None
         
@@ -283,7 +284,7 @@ class PP2Detector:
             try:
                 je = self.parser.parse_player_join(line)
                 if je: self.process_player_join(je)
-            except Exception as e: print(f"❌ Virhe pelaaja-monitorissa: {e}")
+            except Exception as e: log.error(f"❌ Virhe pelaaja-monitorissa: {e}")
     
     def _find_historical_session(self, player_name: str) -> Optional[dict]:
         playlog_path = self.config['pp2']['playlog_path']
@@ -299,7 +300,7 @@ class PP2Detector:
         except Exception: return None
 
     def run(self):
-        print("\n🚀 Käynnistetään PP2 Suspicious Detector...")
+        log.info("🚀 Käynnistetään PP2 Suspicious Detector...")
         if self.discord_bot: self.discord_bot.start_in_thread()
         
         threading.Thread(target=self.monitor_chatlog, daemon=True).start()
@@ -307,7 +308,7 @@ class PP2Detector:
         
         try:
             while True: time.sleep(1)
-        except KeyboardInterrupt: print("\n👋 Lopetetaan...")
+        except KeyboardInterrupt: log.info("👋 Lopetetaan...")
 
 def main():
     PP2Detector().run()

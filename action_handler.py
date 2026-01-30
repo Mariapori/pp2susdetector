@@ -11,6 +11,7 @@ import os
 from datetime import datetime
 from typing import Optional, Any
 from ml_analyzer import AnalysisResult, ViolationLevel
+from logger import log
 
 
 class ActionHandler:
@@ -65,14 +66,14 @@ class ActionHandler:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         level_emoji = {"SEVERE": "🚨", "MODERATE": "⚠️", "MINOR": "📝", "OK": "✅"}
         emoji = level_emoji.get(analysis.level, "❓")
-        print(f"\n{emoji} [{timestamp}] {analysis.level} VIOLATION")
-        print(f"Player: {player_name}")
-        if ip_address: print(f"IP: {ip_address}")
-        print(f"Type: {violation_type}")
-        print(f"Content: {content}")
-        print(f"Reason: {analysis.reason}")
-        print(f"Suggested Action: {analysis.suggested_action}")
-        print("-" * 80)
+        log.info(f"\n{emoji} [{timestamp}] {analysis.level} VIOLATION")
+        log.info(f"Player: {player_name}")
+        if ip_address: log.info(f"IP: {ip_address}")
+        log.info(f"Type: {violation_type}")
+        log.info(f"Content: {content}")
+        log.info(f"Reason: {analysis.reason}")
+        log.info(f"Suggested Action: {analysis.suggested_action}")
+        log.info("-" * 80)
     
     def _send_discord_notification(self, player_name, violation_type, content, analysis, ip_address, ban_command):
         if not self.discord_webhook_url: return
@@ -91,14 +92,14 @@ class ActionHandler:
         payload = {"embeds": [{"title": title, "color": color, "fields": fields, "timestamp": datetime.utcnow().isoformat(), "footer": {"text": "PP2 Suspicious Detector"}}]}
         try:
             requests.post(self.discord_webhook_url, json=payload, timeout=10)
-        except Exception as e: print(f"❌ Error sending Discord notification: {e}")
+        except Exception as e: log.error(f"❌ Error sending Discord notification: {e}")
 
     def execute_command(self, command: str) -> Optional[str]:
         """Standard version of command execution (synchronous)
         Returns the server response text if successful.
         """
         if not self.pp2_admin_url or not self.pp2_admin_password: return None
-        print(f"🚀 Suoritetaan PP2-komento: {command}")
+        log.info(f"🚀 Suoritetaan PP2-komento: {command}")
         try:
             from requests.auth import HTTPBasicAuth
             response = requests.post(
@@ -108,13 +109,13 @@ class ActionHandler:
                 timeout=10
             )
             if response.status_code == 200:
-                print(f"✅ Komento suoritettu")
+                log.info(f"✅ Komento suoritettu")
                 return self._parse_admin_response(response.text)
             else:
-                print(f"❌ Komento epäonnistui: {response.status_code}")
+                log.error(f"❌ Komento epäonnistui: {response.status_code}")
                 return f"Virhe: Palvelin vastasi tilakoodilla {response.status_code}"
         except Exception as e:
-            print(f"❌ Virhe komennon '{command}' suorituksessa: {e}")
+            log.error(f"❌ Virhe komennon '{command}' suorituksessa: {e}")
             return f"Virhe: {str(e)}"
 
     def _save_to_training_data(self, text: str, label: str):
@@ -150,9 +151,9 @@ class ActionHandler:
                     writer.writerow(["text", "label"])
                 writer.writerow([text, label])
             
-            print(f"💾 Tallennettu opetusdataa: '{text[:30]}...' -> {label}")
+            log.info(f"💾 Tallennettu opetusdataa: '{text[:30]}...' -> {label}")
         except Exception as e:
-            print(f"❌ Virhe opetusdatan tallennuksessa: {e}")
+            log.error(f"❌ Virhe opetusdatan tallennuksessa: {e}")
 
     def _parse_admin_response(self, html_content: str) -> str:
         """Extract the relevant response content from the admin HTML"""
@@ -206,7 +207,7 @@ class ActionHandler:
         async def confirm_callback(severity: str):
             # If severity is OK, just return
             if severity == "OK":
-                print(f"✅ Toimenpide pelaajalle {player_name} valittu 'OK' (ei toimenpiteitä)")
+                log.info(f"✅ Toimenpide pelaajalle {player_name} valittu 'OK' (ei toimenpiteitä)")
                 await asyncio.to_thread(self._save_to_training_data, content, "OK")
                 return
 
@@ -217,7 +218,7 @@ class ActionHandler:
                 cmd_template = "/kick {index}"
             elif severity == "MINOR":
                 cmd_template = None # No automated command for minor, maybe just a log?
-                print(f"📝 {player_name}: {content} (MINOR) - Ei automaattista komentoa")
+                log.info(f"📝 {player_name}: {content} (MINOR) - Ei automaattista komentoa")
             else:
                 cmd_template = None
 
@@ -248,7 +249,7 @@ class ActionHandler:
             await asyncio.to_thread(self._save_to_training_data, content, severity)
 
         async def reject_callback():
-            print(f"🚫 Toimenpide pelaajalle {player_name} hylätty Discordin kautta")
+            log.info(f"🚫 Toimenpide pelaajalle {player_name} hylätty Discordin kautta")
             # Save as training data (it was OK)
             await asyncio.to_thread(self._save_to_training_data, content, "OK")
 
