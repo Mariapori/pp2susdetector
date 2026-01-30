@@ -250,6 +250,7 @@ configure_yaml() {
     BANLIST_PATH=${BANLIST_PATH:-"/etc/pp2host/static/ban.dat"}
 
     # Kirjoita config.yaml
+    cat > $CONFIG_FILE << EOF
 # PP2SusDetector Configuration
 # Luotu: $(date)
 
