@@ -264,20 +264,20 @@ class ServerMonitor:
                 join_event.player_name, "nickname", join_event.player_name, analysis,
                 join_event.ip_address, join_event.ban_command, join_event.name_with_ids
             )
-        else:
-            # Welcome message if no nickname violation
-            try:
-                # Give server a moment to register the player fully
-                time.sleep(1)
-                live_index = self.detector.action_handler.get_live_player_index(join_event.player_name, self.server_config)
-                if live_index:
-                    welcome_msg = f"/{live_index} Tervetuloa {join_event.player_name}! Valvon tätä palvelinta. Käytä !yllapitaja komentoa jos tarvitset apua."
-                    log.info(f"👋 Lähetetään tervetuloviesti pelaajalle {join_event.player_name} (ID: {live_index})")
-                    threading.Thread(target=self.detector.action_handler.execute_command, args=(welcome_msg, self.server_config)).start()
-                else:
-                    log.warning(f"⚠️ Ei voitu lähettää tervetuloviestiä: Pelaajan ID ei löytynyt ({join_event.player_name})")
-            except Exception as e:
-                log.error(f"❌ Virhe tervetuloviestin lähetyksessä: {e}")
+        
+        # Welcome message regardless of violation (since actions are manual)
+        try:
+            # Give server a moment to register the player fully
+            time.sleep(1)
+            live_index = self.detector.action_handler.get_live_player_index(join_event.player_name, self.server_config)
+            if live_index:
+                welcome_msg = f"/{live_index} Tervetuloa {join_event.player_name}! Valvon tätä palvelinta. Käytä !yllapitaja komentoa jos tarvitset apua."
+                log.info(f"👋 Lähetetään tervetuloviesti pelaajalle {join_event.player_name} (ID: {live_index})")
+                threading.Thread(target=self.detector.action_handler.execute_command, args=(welcome_msg, self.server_config)).start()
+            else:
+                log.warning(f"⚠️ Ei voitu lähettää tervetuloviestiä: Pelaajan ID ei löytynyt ({join_event.player_name})")
+        except Exception as e:
+            log.error(f"❌ Virhe tervetuloviestin lähetyksessä: {e}")
 
 
 class PP2Detector:
