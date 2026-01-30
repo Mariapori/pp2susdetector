@@ -60,6 +60,42 @@ class ActionHandler:
             self._send_discord_notification(
                 player_name, violation_type, content, analysis, ip_address, ban_command
             )
+
+    def handle_help_request(
+        self,
+        player_name: str,
+        content: str,
+        ip_address: Optional[str] = None
+    ):
+        """Handle a help request (!yllapitaja) from a player"""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"\n🆘 [{timestamp}] AVUNPYYNTÖ")
+        print(f"Pelaaja: {player_name}")
+        if ip_address: print(f"IP: {ip_address}")
+        print(f"Viesti: {content}")
+        print("-" * 80)
+
+        if self.discord_enabled and self.discord_webhook_url:
+            color = 0x00FF00 # Green for help requests
+            fields = [
+                {"name": "Pelaaja", "value": player_name, "inline": True},
+                {"name": "Tyyppi", "value": "🆘 Avunpyyntö", "inline": True}
+            ]
+            if ip_address: fields.append({"name": "IP-osoite", "value": f"`{ip_address}`", "inline": True})
+            fields.append({"name": "Viesti", "value": f"```{content}```", "inline": False})
+            
+            payload = {
+                "embeds": [{
+                    "title": "🆘 APUA TARVITAAN",
+                    "color": color,
+                    "fields": fields,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "footer": {"text": "PP2 Suspicious Detector"}
+                }]
+            }
+            try:
+                requests.post(self.discord_webhook_url, json=payload, timeout=10)
+            except Exception as e: print(f"❌ Virhe avunpyynnön lähetyksessä Discordiin: {e}")
     
     def _log_violation(self, player_name, violation_type, content, analysis, ip_address):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
