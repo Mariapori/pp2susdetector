@@ -354,11 +354,11 @@ class DiscordBot:
                         current_player = {}
                         continue
                 
-                if '=' in line:
-                    key, value = line.split('=', 1)
-                    key = key.strip()
-                    value = value.strip()
-                    current_player[key] = value
+                    if '=' in line:
+                        key, value = line.split('=', 1)
+                        key = key.strip()
+                        value = value.strip()
+                        current_player[key] = value
             
                 # Handle last entry if no trailing newline
                 if 'Name' in current_player and 'Address' in current_player:
