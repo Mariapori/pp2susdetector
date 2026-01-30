@@ -1,27 +1,33 @@
 # PP2 Configuration
-pp2:
-  # Polut lokitiedostoihin. 
-  # Dockerissa esim: "/etc/pp2host/static/chatlog.txt"
-  # Paikallisesti esim: "C:/PP2/static/chatlog.txt" tai "/Users/username/PP2/chatlog.txt"
-  chatlog_path: "/etc/pp2host/static/chatlog.txt"
-  playlog_path: "/etc/pp2host/static/playlog.txt"
-  
-  # Docker-kontin nimi, josta salasana etsitään automaattisesti (vain jos docker on asennettu)
-  container_name: "pp2host"
-  
-  # PP2 Admin Panel URL. Jos ajat paikallisesti, tämä on yleensä localhost tai 127.0.0.1
-  admin_url: "http://localhost:4500/Admin.html"
-  admin_user: "admin"
-  # admin_password: "MANUAL_PASSWORD_HERE" # Voit asettaa tässä tai .env tiedostossa
 
+# Palvelimien asetukset
+# Voit lisätä useampia palvelimia tähän listaan.
+servers:
+  - name: "Main Server"
+    # Polut lokitiedostoihin.
+    # Dockerissa esim: "/etc/pp2host/static/chatlog.txt"
+    # Paikallisesti esim: "C:/PP2/static/chatlog.txt"
+    chatlog_path: "/etc/pp2host/static/chatlog.txt"
+    playlog_path: "/etc/pp2host/static/playlog.txt"
+    banlist_path: "/etc/pp2host/static/ban.dat"
+    
+    # Docker-kontin nimi, josta salasana etsitään automaattisesti
+    container_name: "pp2host"
+    
+    # PP2 Admin Panel URL
+    admin_url: "http://localhost:4500/Admin.html"
+    admin_user: "admin"
+    # admin_password: "PASSWORD" # Jos ei löydy automaattisesti tai .env tiedostosta
+
+# Machine Learning -mallin asetukset
 ml:
-  # Mallin polku
   model_path: "models/violation_model.joblib"
-  
+
+# Discord -asetukset
 discord:
   enabled: true
-  verify_all: true
-  
+  verify_all: true # Tämän voi muuttaa komennolla !verify on/off
+
 rules:
   severe:
     - "Epäsiveelliset nikit"

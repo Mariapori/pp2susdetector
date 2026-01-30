@@ -38,6 +38,8 @@ class ActionHandler:
     
     def handle_violation(
         self,
+        server_name: str,
+        server_config: dict,
         player_name: str,
         violation_type: str,
         content: str,
@@ -50,16 +52,16 @@ class ActionHandler:
             return
         
         # Log to console
-        self._log_violation(player_name, violation_type, content, analysis, ip_address)
+        self._log_violation(server_name, player_name, violation_type, content, analysis, ip_address)
         
         # Priority: interaction via Bot first, fallback to standard webhook
         if self.discord_bot and analysis.level in ["SEVERE", "MODERATE", "MINOR"]:
              self._send_interactive_notification(
-                player_name, violation_type, content, analysis, ip_address, ban_command, name_with_ids
+                server_name, server_config, player_name, violation_type, content, analysis, ip_address, ban_command, name_with_ids
             )
         elif self.discord_enabled and analysis.level in ["SEVERE", "MODERATE", "MINOR"]:
             self._send_discord_notification(
-                player_name, violation_type, content, analysis, ip_address, ban_command
+                server_name, player_name, violation_type, content, analysis, ip_address, ban_command
             )
 
     def handle_help_request(
@@ -98,11 +100,12 @@ class ActionHandler:
                 requests.post(self.discord_webhook_url, json=payload, timeout=10)
             except Exception as e: print(f"❌ Virhe avunpyynnön lähetyksessä Discordiin: {e}")
     
-    def _log_violation(self, player_name, violation_type, content, analysis, ip_address):
+    def _log_violation(self, server_name, player_name, violation_type, content, analysis, ip_address):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         level_emoji = {"SEVERE": "🚨", "MODERATE": "⚠️", "MINOR": "📝", "OK": "✅"}
         emoji = level_emoji.get(analysis.level, "❓")
-        log.info(f"\n{emoji} [{timestamp}] {analysis.level} VIOLATION")
+        log.info(f"\n{emoji} [{timestamp}] {analysis.level} VIOLATION ({server_name})")
+        log.info(f"Server: {server_name}")
         log.info(f"Player: {player_name}")
         if ip_address: log.info(f"IP: {ip_address}")
         log.info(f"Type: {violation_type}")
@@ -111,11 +114,12 @@ class ActionHandler:
         log.info(f"Suggested Action: {analysis.suggested_action}")
         log.info("-" * 80)
     
-    def _send_discord_notification(self, player_name, violation_type, content, analysis, ip_address, ban_command):
+    def _send_discord_notification(self, server_name, player_name, violation_type, content, analysis, ip_address, ban_command):
         if not self.discord_webhook_url: return
         color = {"SEVERE": 0xFF0000, "MODERATE": 0xFFA500, "MINOR": 0xFFFF00}.get(analysis.level, 0x808080)
         title = {"SEVERE": "🚨 VAKAVA RIKKOMUS", "MODERATE": "⚠️ KESKIVAKAVA RIKKOMUS", "MINOR": "📝 LIEVÄ RIKKOMUS"}.get(analysis.level, "❓ Rikkomus")
         fields = [
+            {"name": "Palvelin", "value": server_name, "inline": True},
             {"name": "Pelaaja", "value": player_name, "inline": True},
             {"name": "Tyyppi", "value": "Chat-viesti" if violation_type == "message" else "Nimimerkki", "inline": True}
         ]
@@ -130,18 +134,31 @@ class ActionHandler:
             requests.post(self.discord_webhook_url, json=payload, timeout=10)
         except Exception as e: log.error(f"❌ Error sending Discord notification: {e}")
 
-    def execute_command(self, command: str) -> Optional[str]:
+    def execute_command(self, command: str, server_config: Optional[dict] = None) -> Optional[str]:
         """Standard version of command execution (synchronous)
         Returns the server response text if successful.
+        Requires server_config to know where to send the command.
         """
-        if not self.pp2_admin_url or not self.pp2_admin_password: return None
-        log.info(f"🚀 Suoritetaan PP2-komento: {command}")
+        if not server_config:
+            # Fallback to defaults (single server mode)
+            pp2_admin_url = self.pp2_admin_url
+            pp2_admin_user = self.pp2_admin_user
+            pp2_admin_password = self.pp2_admin_password
+        else:
+            pp2_admin_url = server_config.get('admin_url')
+            pp2_admin_user = server_config.get('admin_user', 'admin')
+            pp2_admin_password = server_config.get('admin_password')
+
+        if not pp2_admin_url or not pp2_admin_password:
+             return "Virhe: Admin-tietoja ei määritetty."
+
+        log.info(f"🚀 Suoritetaan PP2-komento ({pp2_admin_url}): {command}")
         try:
             from requests.auth import HTTPBasicAuth
             response = requests.post(
-                self.pp2_admin_url, data={'c': command},
-                auth=HTTPBasicAuth(self.pp2_admin_user, self.pp2_admin_password),
-                headers={'Content-Type': 'application/x-www-form-urlencoded', 'Referer': self.pp2_admin_url},
+                pp2_admin_url, data={'c': command},
+                auth=HTTPBasicAuth(pp2_admin_user, pp2_admin_password),
+                headers={'Content-Type': 'application/x-www-form-urlencoded', 'Referer': pp2_admin_url},
                 timeout=10
             )
             if response.status_code == 200:
@@ -211,13 +228,23 @@ class ActionHandler:
         except Exception:
             return "Virhe vastauksen käsittelyssä."
 
-    def _get_live_player_index(self, player_name: str) -> Optional[str]:
-        if not self.pp2_admin_url or not self.pp2_admin_password: return None
+    def _get_live_player_index(self, player_name: str, server_config: Optional[dict] = None) -> Optional[str]:
+        if not server_config:
+            # Fallback
+            pp2_admin_url = self.pp2_admin_url
+            pp2_admin_user = self.pp2_admin_user
+            pp2_admin_password = self.pp2_admin_password
+        else:
+            pp2_admin_url = server_config.get('admin_url')
+            pp2_admin_user = server_config.get('admin_user', 'admin')
+            pp2_admin_password = server_config.get('admin_password')
+
+        if not pp2_admin_url or not pp2_admin_password: return None
         try:
             import re
             from requests.auth import HTTPBasicAuth
             response = requests.get(
-                self.pp2_admin_url, auth=HTTPBasicAuth(self.pp2_admin_user, self.pp2_admin_password), timeout=5
+                pp2_admin_url, auth=HTTPBasicAuth(pp2_admin_user, pp2_admin_password), timeout=5
             )
             if response.status_code != 200: return None
             pattern = re.compile(rf"\[(\d+)\]\s+{re.escape(player_name)}", re.IGNORECASE)
@@ -231,6 +258,8 @@ class ActionHandler:
 
     def _send_interactive_notification(
         self,
+        server_name: str,
+        server_config: dict,
         player_name: str,
         violation_type: str,
         content: str,
@@ -251,35 +280,41 @@ class ActionHandler:
             if severity == "SEVERE":
                 cmd_template = ban_command if ban_command else "/banaddress {ip} 9999999 {full_name}"
             elif severity == "MODERATE":
-                cmd_template = "/kick {index}"
+                cmd_template = "/kick {index} 0"
             elif severity == "MINOR":
-                cmd_template = None # No automated command for minor, maybe just a log?
-                log.info(f"📝 {player_name}: {content} (MINOR) - Ei automaattista komentoa")
+                # For MINOR, we send a private warning message
+                cmd_template = "/{index} {reason}"
+                log.info(f"📝 {player_name}: {content} (MINOR) - Lähetetään varoitus")
             else:
                 cmd_template = None
 
             if cmd_template:
                 # Basic substitution
                 cmd = cmd_template.replace("{name}", player_name)
+                if "{reason}" in cmd:
+                     # Use the reason from analysis, or a default message
+                    reason_msg = analysis.reason if analysis.reason else "Sääntörikkomus"
+                    cmd = cmd.replace("{reason}", reason_msg)
+
                 if "{full_name}" in cmd:
                     cmd = cmd.replace("{full_name}", name_with_ids if name_with_ids else player_name)
                 
                 # Resolve index in thread
                 if "{index}" in cmd:
-                    live_index = await asyncio.to_thread(self._get_live_player_index, player_name)
+                    live_index = await asyncio.to_thread(self._get_live_player_index, player_name, server_config)
                     cmd = cmd.replace("{index}", str(live_index) if live_index else player_name)
                 
                 if ip_address:
                     cmd = cmd.replace("{ip}", ip_address)
                 
                 # Execute primary command in thread
-                await asyncio.to_thread(self.execute_command, cmd)
+                await asyncio.to_thread(self.execute_command, cmd, server_config)
                 
                 # Follow up with kick if it was a ban
                 if "/banaddress" in cmd:
-                    live_index = await asyncio.to_thread(self._get_live_player_index, player_name)
+                    live_index = await asyncio.to_thread(self._get_live_player_index, player_name, server_config)
                     kick_cmd = f"/kick {str(live_index) if live_index else player_name}"
-                    await asyncio.to_thread(self.execute_command, kick_cmd)
+                    await asyncio.to_thread(self.execute_command, kick_cmd, server_config)
             
             # Save as training data with the SELECTED severity
             await asyncio.to_thread(self._save_to_training_data, content, severity)
@@ -295,6 +330,7 @@ class ActionHandler:
             'color': 0xFF0000 if analysis.level == "SEVERE" else 0xFFA500 if analysis.level == "MODERATE" else 0x808080,
             'severity': analysis.level, # Initial severity for the dropdown
             'fields': [
+                {'name': 'Palvelin', 'value': server_name, 'inline': True},
                 {'name': 'Pelaaja', 'value': f"`{player_name}`", 'inline': True},
                 {'name': 'Tyyppi', 'value': violation_type, 'inline': True},
                 {'name': 'Sisältö', 'value': f"```{content}```", 'inline': False},

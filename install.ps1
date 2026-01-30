@@ -244,16 +244,27 @@ function Set-YamlConfig {
     $verifyInput = Read-Host "verify_all (true/false) [true]"
     $VerifyAll = if ($verifyInput) { $verifyInput } else { "true" }
     
+    # Banlist Path
+    Write-Host ""
+    Write-Host "PP2 Banlist polku" -ForegroundColor Yellow
+    $defaultBanlist = "C:\PP2\static\ban.dat"
+    $banlistInput = Read-Host "banlist_path [$defaultBanlist]"
+    $BanlistPath = if ($banlistInput) { $banlistInput } else { $defaultBanlist }
+
     $yamlContent = @"
 # PP2SusDetector Configuration
 # Luotu: $(Get-Date)
 
-pp2:
-  chatlog_path: "$ChatlogPath"
-  playlog_path: "$PlaylogPath"
-  container_name: "$ContainerName"
-  admin_url: "$AdminUrl"
-  admin_user: "admin"
+# Palvelimien asetukset
+servers:
+  - name: "Main Server"
+    chatlog_path: "$ChatlogPath"
+    playlog_path: "$PlaylogPath"
+    banlist_path: "$BanlistPath"
+    container_name: "$ContainerName"
+    admin_url: "$AdminUrl"
+    admin_user: "admin"
+    # Salasanan voi asettaa tähän tai .env tiedostoon (ADMIN_PASSWORD)
 
 ml:
   model_path: "models/violation_model.joblib"

@@ -1,4 +1,5 @@
 import discord
+import os
 from discord.ext import commands
 from discord import ui
 import asyncio
@@ -57,9 +58,68 @@ class ModerationView(ui.View):
             child.disabled = True
         await interaction.message.edit(view=self)
 
+class UnbanSelect(ui.Select):
+    """Dropdown menu for selecting a player to unban"""
+    def __init__(self, banned_players: list):
+        options = []
+        # Discord allows max 25 options
+        for player in banned_players[:25]:
+            label = f"{player['name']} ({player['server']})"
+            # Use a unique value to identify the entry
+            # IP|Name|Server
+            value = f"{player['ip']}|{player['name']}|{player['server']}"
+            description = f"Banned: {player['minutes']} min ({player['ip']})"
+            options.append(discord.SelectOption(label=label, value=value, description=description, emoji="🔓"))
+        
+        super().__init__(placeholder="Valitse pelaaja, jonka banni poistetaan...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+
+class UnbanView(ui.View):
+    """View for the unban command"""
+    def __init__(self, banned_players: list, callback_unban: Callable):
+        super().__init__(timeout=180)
+        self.callback_unban = callback_unban
+        self.select_menu = UnbanSelect(banned_players)
+        self.add_item(self.select_menu)
+
+    @ui.button(label="✅ Poista Banni", style=discord.ButtonStyle.success, row=1)
+    async def confirm_unban(self, interaction: discord.Interaction, button: ui.Button):
+        if not self.select_menu.values:
+            await interaction.response.send_message("❌ Valitse ensin pelaaja listasta.", ephemeral=True)
+            return
+
+        selected_value = self.select_menu.values[0]
+        # value is ip|name|server
+        parts = selected_value.split("|")
+        if len(parts) >= 3:
+            ip, name, server = parts[0], parts[1], parts[2]
+        else:
+            ip, name = parts[0], parts[1]
+            server = None
+        
+        success = await self.callback_unban(ip, name, server)
+        
+        if success:
+            await interaction.message.edit(content=f"✅ Banni poistettu: **{name}** ({server or '?'})", view=None)
+        else:
+            await interaction.message.edit(content=f"❌ Bannin poisto epäonnistui: **{name}**", view=None)
+        
+        self.stop()
+        
+    @ui.button(label="❌ Peruuta", style=discord.ButtonStyle.secondary, row=1)
+    async def cancel(self, interaction: discord.Interaction, button: ui.Button):
+        await interaction.message.edit(content="❌ Toiminto peruttu.", view=None)
+        self.stop()
+
 class DiscordBot:
     """Discord bot for interactive moderation"""
-    def __init__(self, token: str, channel_id: Optional[str] = None):
+    def __init__(self, token: str, channel_id: Optional[str] = None, banlist_path: Optional[str] = None, server_banlists: Optional[Dict[str, str]] = None):
+        self.banlist_paths = server_banlists if server_banlists else {}
+        if banlist_path and not self.banlist_paths:
+            self.banlist_paths = {"Default": banlist_path}
+            
         self.token = token
         self.channel_id = int(channel_id) if channel_id else None
         self.cmd_callback = None # Set later
@@ -189,6 +249,27 @@ class DiscordBot:
             except Exception as e:
                 await ctx.send(f"❌ Virhe: {str(e)}")
 
+        @self.bot.command(name="unban")
+        async def unban_player(ctx):
+            """Poista banni pelaajalta: !unban"""
+            if not self.banlist_paths:
+                await ctx.send("❌ Ban-listojen polkuja ei ole määritetty asetuksissa.")
+                return
+
+            try:
+                banned_players = await asyncio.to_thread(self._read_banlist)
+                if not banned_players:
+                    await ctx.send("📋 Ban-lista on tyhjä tai sitä ei voitu lukea.")
+                    return
+
+                # Send the selection view
+                view = UnbanView(banned_players, self._remove_ban)
+                await ctx.send("🔓 Valitse pelaaja, jonka banni poistetaan:", view=view)
+                
+            except Exception as e:
+                log.error(f"❌ Virhe !unban komennossa: {e}")
+                await ctx.send(f"❌ Virhe: {str(e)}")
+
     def set_command_callback(self, callback: Callable[[str], None]):
         """Set the function to call when a PP2 command needs to be executed"""
         self.cmd_callback = callback
@@ -249,3 +330,127 @@ class DiscordBot:
         thread = threading.Thread(target=run, daemon=True)
         thread.start()
         return thread
+
+    def _read_banlist(self) -> list:
+        """Read and parse the ban.dat files from all servers"""
+        all_players = []
+        
+        for server_name, path in self.banlist_paths.items():
+            if not path or not os.path.exists(path):
+                continue
+            
+            try:
+                with open(path, 'r', encoding='utf-8', errors='replace') as f:
+                    content = f.read()
+                
+                # Helper to parse blocks
+                current_player = {}
+                for line in content.splitlines():
+                    line = line.strip()
+                    if not line:
+                        if 'Name' in current_player and 'Address' in current_player:
+                            current_player['server'] = server_name
+                            all_players.append(current_player)
+                        current_player = {}
+                        continue
+                
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip()
+                    current_player[key] = value
+            
+                # Handle last entry if no trailing newline
+                if 'Name' in current_player and 'Address' in current_player:
+                    current_player['server'] = server_name
+                    all_players.append(current_player)
+
+            except Exception as e:
+                log.error(f"❌ Virhe ban-listan luvussa ({server_name}): {e}")
+
+        # Filter duplicates or clean up if needed
+        clean_players = []
+        for p in all_players:
+            clean_players.append({
+                'name': p.get('Name', 'Unknown'),
+                'ip': p.get('Address', 'Unknown'),
+                'minutes': p.get('Minutes', '?'),
+                'server': p.get('server', 'Unknown'),
+                'raw': p 
+            })
+        
+        return clean_players
+
+    async def _remove_ban(self, ip: str, name: str, server: Optional[str] = None) -> bool:
+        """Remove a ban block from the file"""
+        try:
+            return await asyncio.to_thread(self._remove_ban_sync, ip, name, server)
+        except Exception as e:
+            log.error(f"❌ Async wrapper error: {e}")
+            return False
+
+    def _remove_ban_sync(self, ip: str, name: str, server: Optional[str] = None) -> bool:
+        """Synchronous file operation to remove ban"""
+        
+        # Determine which file to modify
+        target_path = None
+        if server and server in self.banlist_paths:
+            target_path = self.banlist_paths[server]
+        elif len(self.banlist_paths) == 1:
+            target_path = list(self.banlist_paths.values())[0]
+            
+        if not target_path or not os.path.exists(target_path):
+            log.error(f"❌ Ban-listaa ei löydy palvelimelle: {server}")
+            return False
+            
+        try:
+            with open(target_path, 'r', encoding='utf-8', errors='replace') as f:
+                lines = f.readlines()
+            
+            new_lines = []
+            skip_block = False
+            # Simple state machine to skip the block matching IP and Name
+            
+            # We need to identify blocks. A block starts with Name=... usually? 
+            # Structure seems to be:
+            # Name = Topias
+            # Address = 192.168.1.1
+            # ...
+            # <empty line>
+            
+            buffer = []
+            
+            for line in lines:
+                if not line.strip(): 
+                    # End of block
+                    if buffer:
+                        # Process buffer
+                        block_content = "".join(buffer)
+                        if f"Name = {name}" in block_content and f"Address = {ip}" in block_content:
+                            # This is the block to remove!
+                            log.info(f"🗑️ Poistetaan ban-lohko: {name} / {ip}")
+                            # Do NOT add to new_lines
+                        else:
+                            new_lines.extend(buffer)
+                        buffer = []
+                    new_lines.append(line) # Keep the empty line separator? Or handle carefully.
+                    continue
+                
+                buffer.append(line)
+            
+            # Flush last buffer
+            if buffer:
+                block_content = "".join(buffer)
+                if f"Name = {name}" in block_content and f"Address = {ip}" in block_content:
+                   log.info(f"🗑️ Poistetaan viimeinen ban-lohko: {name} / {ip}")
+                else:
+                    new_lines.extend(buffer)
+
+            with open(target_path, 'w', encoding='utf-8') as f:
+                f.writelines(new_lines)
+                
+            return True
+            
+        except Exception as e:
+            log.error(f"❌ Virhe ban-listan kirjoituksessa: {e}")
+            return False

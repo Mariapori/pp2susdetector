@@ -229,17 +229,26 @@ configure_yaml() {
     read -p "verify_all (true/false) [true]: " VERIFY_ALL
     VERIFY_ALL=${VERIFY_ALL:-"true"}
     
+    # Banlist Path
+    echo ""
+    echo -e "${YELLOW}PP2 Banlist polku${NC}"
+    read -p "banlist_path [/etc/pp2host/static/ban.dat]: " BANLIST_PATH
+    BANLIST_PATH=${BANLIST_PATH:-"/etc/pp2host/static/ban.dat"}
+
     # Kirjoita config.yaml
-    cat > $CONFIG_FILE << EOF
 # PP2SusDetector Configuration
 # Luotu: $(date)
 
-pp2:
-  chatlog_path: "$CHATLOG_PATH"
-  playlog_path: "$PLAYLOG_PATH"
-  container_name: "$CONTAINER_NAME"
-  admin_url: "$ADMIN_URL"
-  admin_user: "admin"
+# Palvelimien asetukset
+servers:
+  - name: "Main Server"
+    chatlog_path: "$CHATLOG_PATH"
+    playlog_path: "$PLAYLOG_PATH"
+    banlist_path: "$BANLIST_PATH"
+    container_name: "$CONTAINER_NAME"
+    admin_url: "$ADMIN_URL"
+    admin_user: "admin"
+    # Salasanan voi asettaa tähän tai .env tiedostoon (ADMIN_PASSWORD)
 
 ml:
   model_path: "models/violation_model.joblib"

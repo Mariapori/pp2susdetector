@@ -9,12 +9,23 @@ Sovellus joka valvoo PP2 (Pro Pilkki 2) host serverin lokia reaaliaikaisesti ja 
 - 🎣 **Reaaliaikainen valvonta**: Seuraa PP2 hostin chat- ja pelaajalokeja
 - 🤖 **ML-analyysi**
 - 📊 **Kolme vakavuustasoa**:
-  - 🚨 **SEVERE**: Vakavat rikkomukset (rasismi, sotapropaganda, epäsiveellisyys)
-  - ⚠️ **MODERATE**: Keskivakavat rikkomukset (kiroilu, lokitus)
-  - 📝 **MINOR**: Lievät rikkomukset (vain lokitus)
+  - 🚨 **SEVERE**: Vakavat rikkomukset -> **Banni** (rasismi, sotapropaganda, epäsiveellisyys)
+  - ⚠️ **MODERATE**: Keskivakavat rikkomukset -> **Kick** (0 min, ei bannia) (kiroilu, lokitus)
+  - 📝 **MINOR**: Lievät rikkomukset -> **Varoitus** (vain lokitus ja yksityisviesti)
 - 💬 **Discord-integraatio**: Lähettää ilmoitukset vakavista rikkomuksista
 - 💾 **Tietokanta**: Tallentaa kaikki rikkomukset SQLite-tietokantaan
 - 🐳 **Docker-tuki**: Helppo käyttöönotto Docker Composella
+
+## Komennot
+
+### Discord
+- `!unban` - Poista banni pelaajalta (avaa valikon, jossa näkyy palvelin)
+- `!verify [on/off/status]` - Säädä tai tarkista kaikkien viestien tarkastus
+- `!c [palvelin] [komento]` - Suorita konsolikomento (esim. `!c /kick 1` tai `!c server2 /kick 1`)
+- `!train` - Käynnistä koneoppimismallin uudelleenkoulutus
+
+### Pelaajat
+- `!yllapitaja [viesti]` - Lähetä avunpyyntö ylläpidolle (Discordiin)
 
 ## Vaatimukset
 
@@ -74,15 +85,32 @@ docker-compose up -d --build
 
 ## Konfiguraatio
 
-Muokkaa `config.yaml` tiedostoa:
+Muokkaa `config.yaml` tiedostoa. Voit lisätä useampia palvelimia `servers`-listaan:
 
 ```yaml
-pp2:
-  chatlog_path: "/etc/pp2host/static/chatlog.txt"
-  playlog_path: "/etc/pp2host/static/playlog.txt"
+servers:
+  - name: "Main Server"
+    # Polut lokitiedostoihin
+    chatlog_path: "/etc/pp2host/static/chatlog.txt"
+    playlog_path: "/etc/pp2host/static/playlog.txt"
+    banlist_path: "/etc/pp2host/static/ban.dat"
+    
+    # Valinnainen: Docker-kontin nimi salasanan automaattista hakua varten
+    container_name: "pp2host"
+    
+    # Admin-paneeli komentojen suoritusta varten
+    admin_url: "http://localhost:4500/Admin.html"
+    admin_user: "admin"
+    admin_password: "PASSWORD" # Jos ei määritetty, yritetään hakea Dockerista
   
+  # Esimerkki toisesta palvelimesta:
+  # - name: "Second Server"
+  #   chatlog_path: "/path/to/server2/chatlog.txt"
+  #   ...
+
 discord:
   enabled: true
+  verify_all: true # Tämän voi muuttaa komennolla !verify on/off
   
 rules:
   severe:
