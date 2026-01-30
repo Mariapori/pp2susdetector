@@ -64,16 +64,16 @@ install_dependencies() {
     case $OS in
         ubuntu|debian)
             apt-get update -qq
-            apt-get install -y python3 python3-pip python3-venv git curl
+            apt-get install -y python3 python3-pip python3-venv python3-dev git curl pkg-config libsystemd-dev gcc
             ;;
         fedora|rhel|centos|rocky|almalinux)
-            dnf install -y python3 python3-pip git curl
+            dnf install -y python3 python3-pip python3-devel git curl pkgconfig systemd-devel gcc
             ;;
         arch|manjaro)
-            pacman -Sy --noconfirm python python-pip git curl
+            pacman -Sy --noconfirm python python-pip git curl pkgconf systemd gcc
             ;;
         opensuse*|sles)
-            zypper install -y python3 python3-pip git curl
+            zypper install -y python3 python3-pip python3-devel git curl pkg-config systemd-devel gcc
             ;;
         macos)
             if ! command -v brew &> /dev/null; then
@@ -134,10 +134,24 @@ setup_virtualenv() {
     # Aktivoi venv ja asenna riippuvuudet
     source $INSTALL_DIR/venv/bin/activate
     pip install --upgrade pip -q
+    
+    print_step "Asennetaan Python-riippuvuudet (requirements.txt)..."
     pip install -r $INSTALL_DIR/requirements.txt -q
+    
+    # Yritetään asentaa systemd-python erikseen jos ollaan Linuxilla
+    if [ "$OS" != "macos" ]; then
+        print_step "Yritetään asentaa systemd-python..."
+        if pip install systemd-python -q 2>/dev/null; then
+            print_step "systemd-python asennettu onnistuneesti"
+        else
+            print_warning "systemd-python asennus epäonnistui. Journal-logit eivät ole käytössä."
+            print_warning "Tämä ei estä ohjelman toimintaa, mutta logit näkyvät vain konsolissa."
+        fi
+    fi
+    
     deactivate
     
-    print_step "Python-riippuvuudet asennettu"
+    print_step "Virtuaaliympäristö valmis"
 }
 
 configure_env() {
