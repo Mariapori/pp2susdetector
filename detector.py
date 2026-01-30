@@ -162,6 +162,16 @@ class PP2Detector:
         self.processed_messages.add(msg_id)
         log.info(f"📨 Analysoidaan viesti ({message.player_name}): {message.message[:100]}")
         
+        # Check for help request command
+        if message.message.strip().startswith("!yllapitaja"):
+            print(f"🆘 Avunpyyntö havaittu pelaajalta {message.player_name}")
+            self.action_handler.handle_help_request(
+                message.player_name, message.message, player_ip
+            )
+            return
+
+        print(f"📨 Analysoidaan viesti ({message.player_name}): {message.message[:100]}")
+        
         analysis = self.analyzer.analyze_message(message.player_name, message.message)
         
         # Check if we should verify all messages
