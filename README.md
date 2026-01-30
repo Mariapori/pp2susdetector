@@ -143,6 +143,104 @@ Voit ajaa detectoria suoraan Pythonilla, vaikka PP2-hosti ei olisi Dockerissa.
    python detector.py
    ```
 
+## Automaattinen asennus (suositeltu)
+
+### Linux/macOS
+
+Interaktiivinen asennusskripti joka kysyy kaikki tarvittavat asetukset ja konfiguroi systemd servicen:
+
+```bash
+# Tee skripti suoritettavaksi
+chmod +x install.sh
+
+# Suorita asennusskripti (vaatii sudo)
+sudo ./install.sh
+```
+
+Skripti tekee seuraavat asiat:
+- ✅ Asentaa järjestelmäriippuvuudet (Python, pip, venv, git)
+- ✅ Luo `pp2` käyttäjän ja hakemistorakenteen `/opt/pp2susdetector`
+- ✅ Kopioi kaikki tiedostot ja luo Python virtuaaliympäristön
+- ✅ Kysyy ja tallentaa konfiguraation (Discord tokens, polut, jne.)
+- ✅ Konfiguroi ja käynnistää systemd servicen
+
+### Windows
+
+PowerShell-asennusskripti joka asentaa Windows Servicen NSSM:n avulla:
+
+```powershell
+# Suorita PowerShell järjestelmänvalvojana
+.\install.ps1
+
+# Voit myös määrittää asennushakemiston
+.\install.ps1 -InstallDir "D:\pp2susdetector"
+
+# Ohita Windows Servicen asennus
+.\install.ps1 -SkipService
+```
+
+Skripti tekee seuraavat asiat:
+- ✅ Tarkistaa Python 3.10+ ja opastaa asennuksessa
+- ✅ Luo hakemistorakenteen `C:\pp2susdetector` (tai määritetty polku)
+- ✅ Kopioi tiedostot ja luo Python virtuaaliympäristön
+- ✅ Kysyy ja tallentaa konfiguraation
+- ✅ Asentaa Windows Servicen (vaatii NSSM:n)
+- ✅ Luo `run.bat` manuaalista käynnistystä varten
+
+---
+
+## Manuaalinen Systemd-asennus (Linux)
+
+Voit ajaa pp2susdetectoria taustalla systemd-palveluna:
+
+### 1. Luo käyttäjä ja kopioi tiedostot
+
+```bash
+# Luo käyttäjä
+sudo useradd -r -s /bin/false pp2
+
+# Kopioi tiedostot
+sudo mkdir -p /opt/pp2susdetector
+sudo cp -r . /opt/pp2susdetector/
+sudo chown -R pp2:pp2 /opt/pp2susdetector
+
+# Luo virtuaaliympäristö
+cd /opt/pp2susdetector
+sudo -u pp2 python3 -m venv venv
+sudo -u pp2 ./venv/bin/pip install -r requirements.txt
+sudo -u pp2 ./venv/bin/pip install systemd-python
+```
+
+### 2. Asenna palvelu
+
+```bash
+sudo cp pp2susdetector.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable pp2susdetector
+sudo systemctl start pp2susdetector
+```
+
+### 3. Seuraa lokeja
+
+```bash
+# Reaaliaikainen seuranta
+journalctl -u pp2susdetector -f
+
+# Viimeiset 100 riviä
+journalctl -u pp2susdetector -n 100
+
+# Vain virheet
+journalctl -u pp2susdetector -p err
+```
+
+### 4. Hallinta
+
+```bash
+sudo systemctl status pp2susdetector   # Tila
+sudo systemctl restart pp2susdetector  # Uudelleenkäynnistys
+sudo systemctl stop pp2susdetector     # Pysäytys
+```
+
 ## Tietoturva
 
 - Discord webhook URL tallennetaan `.env` tiedostoon (ei versionhallinnassa)

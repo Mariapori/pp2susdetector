@@ -1,0 +1,29 @@
+[Unit]
+Description=PP2 Suspicious Detector - Chat moderation with ML
+After=network.target
+
+[Service]
+Type=simple
+User=pp2
+Group=pp2
+WorkingDirectory=/opt/pp2susdetector
+ExecStart=/opt/pp2susdetector/venv/bin/python detector.py
+Restart=always
+RestartSec=10
+
+# Environment file for secrets (Discord token, admin password, etc.)
+EnvironmentFile=/opt/pp2susdetector/.env
+
+# Logging - goes to systemd journal
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pp2susdetector
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/pp2susdetector/data
+
+[Install]
+WantedBy=multi-user.target
