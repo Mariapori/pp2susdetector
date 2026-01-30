@@ -263,7 +263,7 @@ servers:
     container_name: "$CONTAINER_NAME"
     admin_url: "$ADMIN_URL"
     admin_user: "admin"
-    # Salasanan voi asettaa tähän tai .env tiedostoon (ADMIN_PASSWORD)
+    admin_password: "$ADMIN_PASSWORD"
 
 ml:
   model_path: "models/violation_model.joblib"
