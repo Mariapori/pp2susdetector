@@ -228,7 +228,7 @@ class ActionHandler:
         except Exception:
             return "Virhe vastauksen käsittelyssä."
 
-    def _get_live_player_index(self, player_name: str, server_config: Optional[dict] = None) -> Optional[str]:
+    def get_live_player_index(self, player_name: str, server_config: Optional[dict] = None) -> Optional[str]:
         if not server_config:
             # Fallback
             pp2_admin_url = self.pp2_admin_url
@@ -301,7 +301,7 @@ class ActionHandler:
                 
                 # Resolve index in thread
                 if "{index}" in cmd:
-                    live_index = await asyncio.to_thread(self._get_live_player_index, player_name, server_config)
+                    live_index = await asyncio.to_thread(self.get_live_player_index, player_name, server_config)
                     cmd = cmd.replace("{index}", str(live_index) if live_index else player_name)
                 
                 if ip_address:
@@ -312,7 +312,7 @@ class ActionHandler:
                 
                 # Follow up with kick if it was a ban
                 if "/banaddress" in cmd:
-                    live_index = await asyncio.to_thread(self._get_live_player_index, player_name, server_config)
+                    live_index = await asyncio.to_thread(self.get_live_player_index, player_name, server_config)
                     kick_cmd = f"/kick {str(live_index) if live_index else player_name}"
                     await asyncio.to_thread(self.execute_command, kick_cmd, server_config)
             
