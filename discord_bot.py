@@ -408,40 +408,44 @@ class DiscordBot:
                 lines = f.readlines()
             
             new_lines = []
-            skip_block = False
-            # Simple state machine to skip the block matching IP and Name
-            
-            # We need to identify blocks. A block starts with Name=... usually? 
-            # Structure seems to be:
-            # Name = Topias
-            # Address = 192.168.1.1
-            # ...
-            # <empty line>
-            
             buffer = []
             
+            # Function to check if buffer contains the target player
+            def is_target_block(buf_lines, target_ip, target_name):
+                block_content = "".join(buf_lines)
+                parsed_data = {}
+                for line in buf_lines:
+                    if '=' in line:
+                        parts = line.split('=', 1)
+                        key = parts[0].strip()
+                        val = parts[1].strip()
+                        parsed_data[key] = val
+                
+                # Check for match (case-sensitive for now, or match existing logic)
+                # Existing logic used inclusion, which is weak.
+                # Let's match exact values if present.
+                if 'Name' in parsed_data and 'Address' in parsed_data:
+                    return parsed_data['Name'] == target_name and parsed_data['Address'] == target_ip
+                return False
+
             for line in lines:
                 if not line.strip(): 
                     # End of block
                     if buffer:
-                        # Process buffer
-                        block_content = "".join(buffer)
-                        if f"Name = {name}" in block_content and f"Address = {ip}" in block_content:
-                            # This is the block to remove!
+                        if is_target_block(buffer, ip, name):
                             log.info(f"🗑️ Poistetaan ban-lohko: {name} / {ip}")
-                            # Do NOT add to new_lines
+                            # Skip this block
                         else:
                             new_lines.extend(buffer)
                         buffer = []
-                    new_lines.append(line) # Keep the empty line separator? Or handle carefully.
+                    new_lines.append(line) # Keep the empty line separator
                     continue
                 
                 buffer.append(line)
             
             # Flush last buffer
             if buffer:
-                block_content = "".join(buffer)
-                if f"Name = {name}" in block_content and f"Address = {ip}" in block_content:
+                if is_target_block(buffer, ip, name):
                    log.info(f"🗑️ Poistetaan viimeinen ban-lohko: {name} / {ip}")
                 else:
                     new_lines.extend(buffer)
