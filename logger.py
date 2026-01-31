@@ -40,13 +40,11 @@ def setup_logger(name: str = "pp2susdetector") -> logging.Logger:
     
     logger.setLevel(logging.DEBUG)
     
-    # Console handler - works on all platforms
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.DEBUG)
-    console_format = logging.Formatter('%(message)s')
-    console_handler.setFormatter(console_format)
-    logger.addHandler(console_handler)
+    logger.setLevel(logging.DEBUG)
     
+    # Track if we successfully set up a primary handler
+    used_systemd_journal = False
+
     # Systemd journal handler (Linux with systemd only)
     if IS_SYSTEMD:
         try:
@@ -57,15 +55,30 @@ def setup_logger(name: str = "pp2susdetector") -> logging.Logger:
             journal_format = logging.Formatter('[%(levelname)s] %(message)s')
             journal_handler.setFormatter(journal_format)
             logger.addHandler(journal_handler)
+            used_systemd_journal = True
             logger.info("✅ Systemd journal logging enabled")
         except ImportError:
-            logger.warning("⚠️ systemd-python not installed, journal logging disabled")
+            # We are in systemd but missing the library - we will fall back to console
+            pass
+
+    # Console handler - used if NOT using systemd journal
+    # Systemd automatically captures stdout/stderr, so we don't need both if journal is active
+    if not used_systemd_journal:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.DEBUG)
+        console_format = logging.Formatter('%(message)s')
+        console_handler.setFormatter(console_format)
+        logger.addHandler(console_handler)
+        
+        if IS_SYSTEMD:
+             # We are in systemd but fell back to console
+            logger.warning("⚠️ systemd-python not installed, using console logging (journal disabled)")
             logger.warning("   Install with: pip install systemd-python")
-    elif IS_LINUX:
-        logger.debug("ℹ️ Not running under systemd, using console logging only")
-    else:
-        # Windows / macOS
-        logger.debug(f"ℹ️ Platform: {platform.system()} - using console logging")
+        elif IS_LINUX:
+            logger.debug("ℹ️ Not running under systemd, using console logging only")
+        else:
+            # Windows / macOS
+            logger.debug(f"ℹ️ Platform: {platform.system()} - using console logging")
     
     return logger
 
