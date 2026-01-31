@@ -134,6 +134,17 @@ main() {
     chmod 755 $INSTALL_DIR
     chmod 600 $INSTALL_DIR/.env 2>/dev/null || true
     
+    # Varmista ban-listan oikeudet (luetaan config.yaml:sta)
+    if [ -f "$INSTALL_DIR/config.yaml" ]; then
+        # Yritetään etsiä banlist_path yksinkertaisella grep-komennolla
+        BANLIST_PATH=$(grep "banlist_path:" "$INSTALL_DIR/config.yaml" | head -n 1 | awk -F': ' '{print $2}' | tr -d '"' | tr -d "'" | tr -d '\r')
+        
+        if [ ! -z "$BANLIST_PATH" ] && [ -f "$BANLIST_PATH" ]; then
+             print_step "Varmistetaan ban-listan kirjoitusoikeudet: $BANLIST_PATH"
+             chmod 666 "$BANLIST_PATH" || true
+        fi
+    fi
+    
     # 5. Päivitä riippuvuudet
     print_step "Päivitetään Python-riippuvuudet..."
     if [ -f "$INSTALL_DIR/original_venv_bin_python" ]; then

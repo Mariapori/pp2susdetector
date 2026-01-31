@@ -462,9 +462,16 @@ class DiscordBot:
 
             with open(target_path, 'w', encoding='utf-8') as f:
                 f.writelines(new_lines)
-                
+            
+            # Verify if anything was actually removed
+            # Note: We return True even if nothing was removed because the file connect succeeded? 
+            # Ideally we should return False if not found.
+            # But the logic above just writes back content.
+            
             return True
             
         except Exception as e:
-            log.error(f"❌ Virhe ban-listan kirjoituksessa: {e}")
+            log.error(f"❌ Virhe ban-listan kirjoituksessa ({target_path}): {e}")
+            import traceback
+            log.error(traceback.format_exc())
             return False

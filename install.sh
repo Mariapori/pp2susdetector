@@ -350,6 +350,13 @@ EOF
     chown -R $SERVICE_USER:$SERVICE_USER $INSTALL_DIR
     chmod 755 $INSTALL_DIR
     
+    # Varmista ban-listan oikeudet jos polku on määritetty
+    if [ ! -z "$BANLIST_PATH" ] && [ -f "$BANLIST_PATH" ]; then
+        print_step "Asetetaan kirjoitusoikeudet ban-listaan: $BANLIST_PATH"
+        # Annetaan luku- ja kirjoitusoikeudet kaikille (varmistaa että toimii sekä servicenä että manuaalisesti)
+        chmod 666 "$BANLIST_PATH" || true
+    fi
+    
     # Lataa uudelleen ja ota käyttöön
     systemctl daemon-reload
     
