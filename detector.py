@@ -245,9 +245,7 @@ class ServerMonitor:
             'ip': join_event.ip_address, 'ban_command': join_event.ban_command,
             'name_with_ids': join_event.name_with_ids
         }
-        player_id = f"{join_event.player_name}:{join_event.ip_address}"
-        if player_id in self.processed_players: return
-        self.processed_players.add(player_id)
+
         
         log.info(f"👤 [{self.name}] Liittyi: {join_event.player_name} ({join_event.ip_address})")
         analysis = self.detector.analyzer.analyze_nickname(join_event.player_name)
