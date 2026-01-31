@@ -368,18 +368,28 @@ class DiscordBot:
             except Exception as e:
                 log.error(f"❌ Virhe ban-listan luvussa ({server_name}): {e}")
 
-        # Filter duplicates or clean up if needed
-        clean_players = []
-        for p in all_players:
-            clean_players.append({
-                'name': p.get('Name', 'Unknown'),
-                'ip': p.get('Address', 'Unknown'),
-                'minutes': p.get('Minutes', '?'),
-                'server': p.get('server', 'Unknown'),
-                'raw': p 
-            })
+        # Filter duplicates using a dictionary
+        # Key: (server, name, ip) -> Value: player_dict
+        unique_players = {}
         
-        return clean_players
+        for p in all_players:
+            name = p.get('Name', 'Unknown')
+            ip = p.get('Address', 'Unknown')
+            server = p.get('server', 'Unknown')
+            key = (server, name, ip)
+            
+            # We keep the last occurrence or just one of them.
+            # It doesn't matter much which one, as long as we have 
+            # the info needed to unban.
+            unique_players[key] = {
+                'name': name,
+                'ip': ip,
+                'minutes': p.get('Minutes', '?'),
+                'server': server,
+                'raw': p
+            }
+
+        return list(unique_players.values())
 
     async def _remove_ban(self, ip: str, name: str, server: Optional[str] = None) -> bool:
         """Remove a ban block from the file"""
