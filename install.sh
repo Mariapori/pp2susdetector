@@ -164,15 +164,29 @@ configure_env() {
     ENV_FILE="$INSTALL_DIR/.env"
     
     # Discord Bot Token
-    echo -e "${YELLOW}Discord Bot Token${NC}"
+    echo -e "${YELLOW}Discord Bot Token (valinnainen - jätä tyhjäksi jos käytät vain Stoatia)${NC}"
     echo "Saat tämän Discord Developer Portalista (https://discord.com/developers/applications)"
     read -p "DISCORD_BOT_TOKEN: " DISCORD_BOT_TOKEN
     
     # Discord Webhook URL
     echo ""
-    echo -e "${YELLOW}Discord Webhook URL${NC}"
+    echo -e "${YELLOW}Discord Webhook URL (valinnainen)${NC}"
     echo "Luo webhook Discord-palvelimellesi kanava-asetuksista"
     read -p "DISCORD_WEBHOOK_URL: " DISCORD_WEBHOOK_URL
+    
+    # Stoat Bot Token
+    echo ""
+    echo -e "${YELLOW}Stoat (Revolt) Bot Token (valinnainen - jätä tyhjäksi jos käytät vain Discordia)${NC}"
+    echo "Luo botti Revolt/Stoat-palvelimellasi ja kopioi token"
+    read -p "STOAT_BOT_TOKEN: " STOAT_BOT_TOKEN
+    
+    # Stoat Channel ID
+    if [ ! -z "$STOAT_BOT_TOKEN" ]; then
+        echo ""
+        echo -e "${YELLOW}Stoat Channel ID${NC}"
+        echo "Kanavan ID johon botti lähettää ilmoitukset"
+        read -p "STOAT_CHANNEL_ID: " STOAT_CHANNEL_ID
+    fi
     
     # Admin Password
     echo ""
@@ -186,11 +200,13 @@ configure_env() {
 # PP2SusDetector Environment Configuration
 # Luotu: $(date)
 
-# Discord Bot Token (Vaaditaan)
+# Discord (valinnainen)
 DISCORD_BOT_TOKEN=$DISCORD_BOT_TOKEN
-
-# Discord Webhook URL (Vaaditaan)
 DISCORD_WEBHOOK_URL=$DISCORD_WEBHOOK_URL
+
+# Stoat / Revolt (valinnainen)
+STOAT_BOT_TOKEN=$STOAT_BOT_TOKEN
+STOAT_CHANNEL_ID=$STOAT_CHANNEL_ID
 
 # PP2 Admin Password (Valinnainen - jos tyhjä, haetaan Dockerista)
 ADMIN_PASSWORD=$ADMIN_PASSWORD
@@ -237,11 +253,21 @@ configure_yaml() {
     read -p "admin_url [http://localhost:4500/Admin.html]: " ADMIN_URL
     ADMIN_URL=${ADMIN_URL:-"http://localhost:4500/Admin.html"}
     
-    # Discord verify_all
+    # Verify all
     echo ""
-    echo -e "${YELLOW}Tarkista kaikki viestit Discordissa?${NC}"
+    echo -e "${YELLOW}Tarkista kaikki viestit? (moderointibotti)${NC}"
     read -p "verify_all (true/false) [true]: " VERIFY_ALL
     VERIFY_ALL=${VERIFY_ALL:-"true"}
+    
+    # Discord vs Stoat
+    DISCORD_ENABLED="false"
+    STOAT_ENABLED="false"
+    if [ ! -z "$DISCORD_BOT_TOKEN" ] || [ ! -z "$DISCORD_WEBHOOK_URL" ]; then
+        DISCORD_ENABLED="true"
+    fi
+    if [ ! -z "$STOAT_BOT_TOKEN" ]; then
+        STOAT_ENABLED="true"
+    fi
     
     # Banlist Path
     echo ""
@@ -269,8 +295,13 @@ ml:
   model_path: "models/violation_model.joblib"
 
 discord:
-  enabled: true
+  enabled: $DISCORD_ENABLED
   verify_all: $VERIFY_ALL
+
+stoat:
+  enabled: $STOAT_ENABLED
+  api_url: "https://api.revolt.chat"
+  ws_url: "wss://ws.revolt.chat"
 
 rules:
   severe:

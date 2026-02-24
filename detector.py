@@ -14,7 +14,15 @@ from dotenv import load_dotenv
 from log_parser import LogParser, ChatMessage, PlayerJoinEvent
 from ml_analyzer import MLAnalyzer
 from action_handler import ActionHandler
-from discord_bot import DiscordBot
+try:
+    from discord_bot import DiscordBot
+except ImportError:
+    DiscordBot = None
+    
+try:
+    from stoat_bot import StoatBot
+except ImportError:
+    StoatBot = None
 from database import Database
 from logger import log
 
@@ -296,31 +304,55 @@ class PP2Detector:
         self.discord_bot = None
         bot_token = os.getenv("DISCORD_BOT_TOKEN")
         
+        # Stoat bot
+        self.stoat_bot = None
+        stoat_token = os.getenv("STOAT_BOT_TOKEN")
+        
         # We need to pick a banlist path for the bot if possible. 
         # With multiple servers, there are multiple banlists.
         # Ideally the bot can handle multiple, or we aggregate.
         # For now, let's use the first server's banlist as 'default' for global bot ops.
-        if bot_token:
+        server_banlists = {}
+        if self.config.get('servers'):
+            for srv in self.config['servers']:
+                if srv.get('banlist_path'):
+                    server_banlists[srv.get('name', 'Unknown')] = srv.get('banlist_path')
+
+        if bot_token and DiscordBot:
             log.info("🤖 Alustetaan Discord-botti...")
-            server_banlists = {}
-            if self.config.get('servers'):
-                for srv in self.config['servers']:
-                    if srv.get('banlist_path'):
-                        server_banlists[srv.get('name', 'Unknown')] = srv.get('banlist_path')
-            
             self.discord_bot = DiscordBot(bot_token, server_banlists=server_banlists)
+        elif bot_token and not DiscordBot:
+            log.warning("⚠️ Discord-botti ohitettu: 'discord.py' ei ole asennettu")
+        
+        if stoat_token and StoatBot:
+            stoat_config = self.config.get('stoat', {})
+            log.info("🦦 Alustetaan Stoat-botti...")
+            self.stoat_bot = StoatBot(
+                token=stoat_token,
+                channel_id=os.getenv('STOAT_CHANNEL_ID'),
+                api_url=stoat_config.get('api_url', 'https://api.revolt.chat'),
+                ws_url=stoat_config.get('ws_url', 'wss://ws.revolt.chat'),
+                server_banlists=server_banlists
+            )
+        elif stoat_token and not StoatBot:
+            log.warning("⚠️ Stoat-botti ohitettu: 'websockets' ei ole asennettu")
+        
+        # Stoat config
+        stoat_config = self.config.get('stoat', {})
+        stoat_enabled = stoat_config.get('enabled', False)
         
         # Action Handler (global)
-        # We don't pass specific admin creds here anymore effectively, 
-        # or we pass defaults. But execute_command will require server_config now.
+        discord_config = self.config.get('discord', {})
         self.action_handler = ActionHandler(
             discord_webhook_url=os.getenv('DISCORD_WEBHOOK_URL'),
-            discord_enabled=self.config['discord']['enabled'],
-            # Globals/Defaults if needed:
+            discord_enabled=discord_config.get('enabled', False),
             pp2_admin_url=None, 
             pp2_admin_user="admin",
             pp2_admin_password=None,
-            discord_bot=self.discord_bot
+            discord_bot=self.discord_bot,
+            stoat_bot=self.stoat_bot,
+            stoat_webhook_url=os.getenv('STOAT_WEBHOOK_URL'),
+            stoat_enabled=stoat_enabled
         )
         
         self.config_path = config_path
@@ -328,7 +360,10 @@ class PP2Detector:
         if self.discord_bot:
             self.discord_bot.set_command_callback(self._handle_bot_command)
             self.discord_bot.set_config_callback(self._handle_config_update)
-            # Pass full server list to bot if needed, or bot calls back to us
+        
+        if self.stoat_bot:
+            self.stoat_bot.set_command_callback(self._handle_bot_command)
+            self.stoat_bot.set_config_callback(self._handle_config_update)
         
         Path("data").mkdir(exist_ok=True)
         self.db = Database("data/violations.db")
@@ -416,6 +451,7 @@ class PP2Detector:
     def run(self):
         log.info("🚀 Käynnistetään PP2 Suspicious Detector (Multi-Server)...")
         if self.discord_bot: self.discord_bot.start_in_thread()
+        if self.stoat_bot: self.stoat_bot.start_in_thread()
         
         for monitor in self.monitors:
             monitor.start()

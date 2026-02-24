@@ -162,36 +162,53 @@ function Set-EnvironmentConfig {
     $EnvFile = "$InstallDir\.env"
     
     # Discord Bot Token
-    Write-Host "Discord Bot Token" -ForegroundColor Yellow
+    Write-Host "Discord Bot Token (valinnainen - jätä tyhjäksi jos käytät vain Stoatia)" -ForegroundColor Yellow
     Write-Host "Saat tämän Discord Developer Portalista (https://discord.com/developers/applications)"
-    $DiscordBotToken = Read-Host "DISCORD_BOT_TOKEN"
+    $script:DiscordBotToken = Read-Host "DISCORD_BOT_TOKEN"
     
     # Discord Webhook URL
     Write-Host ""
-    Write-Host "Discord Webhook URL" -ForegroundColor Yellow
+    Write-Host "Discord Webhook URL (valinnainen)" -ForegroundColor Yellow
     Write-Host "Luo webhook Discord-palvelimellesi kanava-asetuksista"
-    $DiscordWebhookUrl = Read-Host "DISCORD_WEBHOOK_URL"
+    $script:DiscordWebhookUrl = Read-Host "DISCORD_WEBHOOK_URL"
+    
+    # Stoat Bot Token
+    Write-Host ""
+    Write-Host "Stoat (Revolt) Bot Token (valinnainen - jätä tyhjäksi jos käytät vain Discordia)" -ForegroundColor Yellow
+    Write-Host "Luo botti Revolt/Stoat-palvelimellasi ja kopioi token"
+    $script:StoatBotToken = Read-Host "STOAT_BOT_TOKEN"
+    
+    # Stoat Channel ID
+    $script:StoatChannelId = ""
+    if ($script:StoatBotToken) {
+        Write-Host ""
+        Write-Host "Stoat Channel ID" -ForegroundColor Yellow
+        Write-Host "Kanavan ID johon botti lähettää ilmoitukset"
+        $script:StoatChannelId = Read-Host "STOAT_CHANNEL_ID"
+    }
     
     # Admin Password
     Write-Host ""
     Write-Host "PP2 Admin Password" -ForegroundColor Yellow
     Write-Host "(Jätä tyhjäksi jos haet Dockerista automaattisesti)"
     $AdminPassword = Read-Host "ADMIN_PASSWORD" -AsSecureString
-    $AdminPasswordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($AdminPassword))
+    $script:AdminPasswordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($AdminPassword))
     
     # Kirjoita .env tiedosto
     $envContent = @"
 # PP2SusDetector Environment Configuration
 # Luotu: $(Get-Date)
 
-# Discord Bot Token (Vaaditaan)
-DISCORD_BOT_TOKEN=$DiscordBotToken
+# Discord (valinnainen)
+DISCORD_BOT_TOKEN=$($script:DiscordBotToken)
+DISCORD_WEBHOOK_URL=$($script:DiscordWebhookUrl)
 
-# Discord Webhook URL (Vaaditaan)
-DISCORD_WEBHOOK_URL=$DiscordWebhookUrl
+# Stoat / Revolt (valinnainen)
+STOAT_BOT_TOKEN=$($script:StoatBotToken)
+STOAT_CHANNEL_ID=$($script:StoatChannelId)
 
 # PP2 Admin Password (Valinnainen - jos tyhjä, haetaan Dockerista)
-ADMIN_PASSWORD=$AdminPasswordPlain
+ADMIN_PASSWORD=$($script:AdminPasswordPlain)
 
 # ML Model Path (Oletusarvo)
 ML_MODEL_PATH=models/violation_model.joblib
@@ -238,11 +255,15 @@ function Set-YamlConfig {
     $adminUrlInput = Read-Host "admin_url [$defaultAdminUrl]"
     $AdminUrl = if ($adminUrlInput) { $adminUrlInput } else { $defaultAdminUrl }
     
-    # Discord verify_all
+    # Verify all
     Write-Host ""
-    Write-Host "Tarkista kaikki viestit Discordissa?" -ForegroundColor Yellow
+    Write-Host "Tarkista kaikki viestit? (moderointibotti)" -ForegroundColor Yellow
     $verifyInput = Read-Host "verify_all (true/false) [true]"
     $VerifyAll = if ($verifyInput) { $verifyInput } else { "true" }
+    
+    # Determine enabled platforms
+    $DiscordEnabled = if ($script:DiscordBotToken -or $script:DiscordWebhookUrl) { "true" } else { "false" }
+    $StoatEnabled = if ($script:StoatBotToken) { "true" } else { "false" }
     
     # Banlist Path
     Write-Host ""
@@ -270,8 +291,13 @@ ml:
   model_path: "models/violation_model.joblib"
 
 discord:
-  enabled: true
+  enabled: $DiscordEnabled
   verify_all: $VerifyAll
+
+stoat:
+  enabled: $StoatEnabled
+  api_url: "https://api.revolt.chat"
+  ws_url: "wss://ws.revolt.chat"
 
 rules:
   severe:

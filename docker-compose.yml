@@ -19,6 +19,9 @@ services:
     environment:
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - STOAT_BOT_TOKEN=${STOAT_BOT_TOKEN}
+      - STOAT_CHANNEL_ID=${STOAT_CHANNEL_ID}
+      - STOAT_WEBHOOK_URL=${STOAT_WEBHOOK_URL}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

@@ -2,7 +2,7 @@
 
 Prototyyppi hahmoteltu ja testailtu Google AntiGravityn avulla.
 
-Sovellus joka valvoo PP2 (Pro Pilkki 2) host serverin lokia reaaliaikaisesti ja analysoi pelaajien käyttäytymistä ML:n avulla. Rikkomukset kategorisoidaan vakavuuden mukaan ja raportoidaan Discord-kanavalle.
+Sovellus joka valvoo PP2 (Pro Pilkki 2) host serverin lokia reaaliaikaisesti ja analysoi pelaajien käyttäytymistä ML:n avulla. Rikkomukset kategorisoidaan vakavuuden mukaan ja raportoidaan Discord- ja/tai Stoat (Revolt) -kanavalle.
 
 ## Ominaisuudet
 
@@ -12,7 +12,8 @@ Sovellus joka valvoo PP2 (Pro Pilkki 2) host serverin lokia reaaliaikaisesti ja 
   - 🚨 **SEVERE**: Vakavat rikkomukset -> **Banni** (rasismi, sotapropaganda, epäsiveellisyys)
   - ⚠️ **MODERATE**: Keskivakavat rikkomukset -> **Kick** (0 min, ei bannia) (kiroilu, lokitus)
   - 📝 **MINOR**: Lievät rikkomukset -> **Varoitus** (vain lokitus ja yksityisviesti)
-- 💬 **Discord-integraatio**: Lähettää ilmoitukset vakavista rikkomuksista
+- 💬 **Discord-integraatio**: Lähettää ilmoitukset vakavista rikkomuksista (valinnainen)
+- 🦦 **Stoat/Revolt-integraatio**: Vaihtoehtoinen tai rinnakkainen chat-alusta (valinnainen)
 - 💾 **Tietokanta**: Tallentaa kaikki rikkomukset SQLite-tietokantaan
 - 🐳 **Docker-tuki**: Helppo käyttöönotto Docker Composella
 
@@ -24,13 +25,21 @@ Sovellus joka valvoo PP2 (Pro Pilkki 2) host serverin lokia reaaliaikaisesti ja 
 - `!c [palvelin] [komento]` - Suorita konsolikomento (esim. `!c /kick 1` tai `!c server2 /kick 1`)
 - `!train` - Käynnistä koneoppimismallin uudelleenkoulutus
 
+### Stoat (Revolt)
+- `!unban [pelaaja]` - Listaa tai poista banneja
+- `!verify [on/off/status]` - Säädä tai tarkista kaikkien viestien tarkastus
+- `!c [palvelin] [komento]` - Suorita konsolikomento
+- `!train` - Käynnistä koneoppimismallin uudelleenkoulutus
+- `!vahvista <pelaaja> [taso]` - Vahvista moderointitoimenpide (SEVERE/MODERATE/MINOR/OK)
+- `!hylkaa <pelaaja>` - Hylätä moderointitoimenpide
+
 ### Pelaajat
 - `!yllapitaja [viesti]` - Lähetä avunpyyntö ylläpidolle (Discordiin)
 
 ## Vaatimukset
 
 - Docker ja Docker Compose (Valinnainen)
-- Discord webhook URL
+- Vähintään yksi: Discord webhook/bot URL **tai** Stoat (Revolt) bot token
 
 ## Asennus
 
@@ -44,12 +53,27 @@ cd /Users/mariapori/Projektit/pp2susdetector
 cp .env.example .env
 ```
 
-3. **Muokkaa `.env` tiedostoa**:
+3. **Muokkaa `.env` tiedostoa** (Discord, Stoat tai molemmat):
 ```env
+# Discord (valinnainen)
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your-webhook-url
+DISCORD_BOT_TOKEN=your_discord_bot_token
+
+# Stoat / Revolt (valinnainen)
+STOAT_BOT_TOKEN=your_stoat_bot_token
+STOAT_CHANNEL_ID=your_stoat_channel_id
 ```
 
-4. **Käynnistä palvelut**:
+4. **Muokkaa `config.yaml`** (aseta käytössä olevat alustat):
+```yaml
+discord:
+  enabled: false  # tai true
+
+stoat:
+  enabled: true   # tai false
+```
+
+5. **Käynnistä palvelut**:
 ```bash
 docker-compose up -d
 ```
@@ -90,28 +114,23 @@ Muokkaa `config.yaml` tiedostoa. Voit lisätä useampia palvelimia `servers`-lis
 ```yaml
 servers:
   - name: "Main Server"
-    # Polut lokitiedostoihin
     chatlog_path: "/etc/pp2host/static/chatlog.txt"
     playlog_path: "/etc/pp2host/static/playlog.txt"
     banlist_path: "/etc/pp2host/static/ban.dat"
-    
-    # Valinnainen: Docker-kontin nimi salasanan automaattista hakua varten
     container_name: "pp2host"
-    
-    # Admin-paneeli komentojen suoritusta varten
     admin_url: "http://localhost:4500/Admin.html"
     admin_user: "admin"
-    admin_password: "PASSWORD" # Jos ei määritetty, yritetään hakea Dockerista
-  
-  # Esimerkki toisesta palvelimesta:
-  # - name: "Second Server"
-  #   chatlog_path: "/path/to/server2/chatlog.txt"
-  #   ...
+    admin_password: "PASSWORD"
 
 discord:
-  enabled: true
-  verify_all: true # Tämän voi muuttaa komennolla !verify on/off
-  
+  enabled: true    # false jos ei käytössä
+  verify_all: true
+
+stoat:
+  enabled: false   # true jos käytössä
+  api_url: "https://api.revolt.chat"
+  ws_url: "wss://ws.revolt.chat"
+
 rules:
   severe:
     - "Epäsiveelliset nikit"
@@ -131,15 +150,17 @@ rules:
 
 Rikkomukset tallennetaan `data/violations.db` SQLite-tietokantaan. Voit tarkastella tietokantaa esim. DB Browser for SQLite -ohjelmalla.
 
-## Discord-ilmoitukset
+## Ilmoitukset
 
-Vakavat ja keskivakavat rikkomukset lähetetään Discordiin. Ilmoitus sisältää:
+Vakavat ja keskivakavat rikkomukset lähetetään konfiguroituihin alustoihin (Discord ja/tai Stoat). Ilmoitus sisältää:
 - Pelaajan nimen
 - IP-osoitteen
 - Rikkomuksen sisällön
 - ML:n perustelun
 - Ehdotetun toimenpiteen
 - Valmiin ban-komennon (vakavissa tapauksissa)
+
+> **Huom:** Discordissa moderointitoimenpiteet vahvistetaan interaktiivisilla napeilla. Stoatissa käytetään tekstikomentoja (`!vahvista` / `!hylkaa`) koska Revolt ei tue interaktiivisia elementtejä.
 
 ## Kehitys
 
@@ -271,6 +292,6 @@ sudo systemctl stop pp2susdetector     # Pysäytys
 
 ## Tietoturva
 
-- Discord webhook URL tallennetaan `.env` tiedostoon (ei versionhallinnassa)
+- Discord/Stoat tokenit tallennetaan `.env` tiedostoon (ei versionhallinnassa)
 - Lokitiedostot ovat read-only detectorille
 - Tietokanta tallennetaan paikallisesti `data/` kansioon

@@ -24,7 +24,10 @@ class ActionHandler:
         pp2_admin_url: Optional[str] = None,
         pp2_admin_user: str = "admin",
         pp2_admin_password: Optional[str] = None,
-        discord_bot: Optional[Any] = None
+        discord_bot: Optional[Any] = None,
+        stoat_bot: Optional[Any] = None,
+        stoat_webhook_url: Optional[str] = None,
+        stoat_enabled: bool = False
     ):
         """
         Initialize action handler
@@ -35,6 +38,9 @@ class ActionHandler:
         self.pp2_admin_user = pp2_admin_user
         self.pp2_admin_password = pp2_admin_password
         self.discord_bot = discord_bot
+        self.stoat_bot = stoat_bot
+        self.stoat_webhook_url = stoat_webhook_url
+        self.stoat_enabled = stoat_enabled and (stoat_bot is not None or stoat_webhook_url is not None)
     
     def handle_violation(
         self,
@@ -54,13 +60,23 @@ class ActionHandler:
         # Log to console
         self._log_violation(server_name, player_name, violation_type, content, analysis, ip_address)
         
-        # Priority: interaction via Bot first, fallback to standard webhook
+        # Discord: Priority interaction via Bot, fallback to webhook
         if self.discord_bot and analysis.level in ["SEVERE", "MODERATE", "MINOR"]:
              self._send_interactive_notification(
                 server_name, server_config, player_name, violation_type, content, analysis, ip_address, ban_command, name_with_ids
             )
         elif self.discord_enabled and analysis.level in ["SEVERE", "MODERATE", "MINOR"]:
             self._send_discord_notification(
+                server_name, player_name, violation_type, content, analysis, ip_address, ban_command
+            )
+        
+        # Stoat: Priority interaction via Bot, fallback to webhook
+        if self.stoat_bot and analysis.level in ["SEVERE", "MODERATE", "MINOR"]:
+            self._send_stoat_interactive_notification(
+                server_name, server_config, player_name, violation_type, content, analysis, ip_address, ban_command, name_with_ids
+            )
+        elif self.stoat_enabled and analysis.level in ["SEVERE", "MODERATE", "MINOR"]:
+            self._send_stoat_notification(
                 server_name, player_name, violation_type, content, analysis, ip_address, ban_command
             )
 
@@ -78,20 +94,23 @@ class ActionHandler:
         print(f"Viesti: {content}")
         print("-" * 80)
 
-        if self.discord_enabled and self.discord_webhook_url:
-            color = 0x00FF00 # Green for help requests
-            fields = [
-                {"name": "Pelaaja", "value": player_name, "inline": True},
-                {"name": "Tyyppi", "value": "🆘 Avunpyyntö", "inline": True}
+        help_embed_data = {
+            'title': '🆘 APUA TARVITAAN',
+            'color': 0x00FF00,
+            'fields': [
+                {'name': 'Pelaaja', 'value': player_name, 'inline': True},
+                {'name': 'Tyyppi', 'value': '🆘 Avunpyyntö', 'inline': True}
             ]
-            if ip_address: fields.append({"name": "IP-osoite", "value": f"`{ip_address}`", "inline": True})
-            fields.append({"name": "Viesti", "value": f"```{content}```", "inline": False})
-            
+        }
+        if ip_address: help_embed_data['fields'].append({'name': 'IP-osoite', 'value': f'`{ip_address}`', 'inline': True})
+        help_embed_data['fields'].append({'name': 'Viesti', 'value': f'```{content}```', 'inline': False})
+
+        if self.discord_enabled and self.discord_webhook_url:
             payload = {
                 "embeds": [{
-                    "title": "🆘 APUA TARVITAAN",
-                    "color": color,
-                    "fields": fields,
+                    "title": help_embed_data['title'],
+                    "color": help_embed_data['color'],
+                    "fields": help_embed_data['fields'],
                     "timestamp": datetime.utcnow().isoformat(),
                     "footer": {"text": "PP2 Suspicious Detector"}
                 }]
@@ -99,6 +118,15 @@ class ActionHandler:
             try:
                 requests.post(self.discord_webhook_url, json=payload, timeout=10)
             except Exception as e: print(f"❌ Virhe avunpyynnön lähetyksessä Discordiin: {e}")
+
+        if self.stoat_enabled or self.stoat_bot:
+            try:
+                bot = self.stoat_bot
+                if bot:
+                    bot.send_notification(help_embed_data)
+                elif self.stoat_webhook_url:
+                    self._send_stoat_rest_notification(help_embed_data)
+            except Exception as e: print(f"❌ Virhe avunpyynnön lähetyksessä Stoatiin: {e}")
     
     def _log_violation(self, server_name, player_name, violation_type, content, analysis, ip_address):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -348,3 +376,121 @@ class ActionHandler:
             self.discord_bot.send_interaction(embed_data, confirm_callback, reject_callback),
             self.discord_bot.bot.loop
         )
+
+    def _send_stoat_notification(self, server_name, player_name, violation_type, content, analysis, ip_address, ban_command):
+        """Send a notification to Stoat via REST API (webhook-style, no bot)"""
+        embed_data = self._build_notification_embed(server_name, player_name, violation_type, content, analysis, ip_address, ban_command)
+        self._send_stoat_rest_notification(embed_data)
+
+    def _send_stoat_rest_notification(self, embed_data: dict):
+        """Send a Stoat notification using REST API directly (no bot needed)"""
+        if not self.stoat_webhook_url:
+            return
+        try:
+            # stoat_webhook_url is expected to be a full channel message endpoint
+            # e.g. https://api.revolt.chat/channels/CHANNEL_ID/messages
+            # with token from env
+            import os
+            token = os.getenv('STOAT_BOT_TOKEN', '')
+            headers = {'X-Bot-Token': token, 'Content-Type': 'application/json'}
+            
+            # Convert to Revolt embed
+            color_int = embed_data.get('color', 0x808080)
+            color_hex = f"#{color_int:06x}"
+            desc_parts = []
+            if embed_data.get('description'):
+                desc_parts.append(embed_data['description'])
+            for field in embed_data.get('fields', []):
+                desc_parts.append(f"**{field.get('name', '')}:** {field.get('value', '')}")
+            
+            payload = {
+                'embeds': [{
+                    'type': 'Text',
+                    'title': embed_data.get('title', 'Notification'),
+                    'description': '\n'.join(desc_parts),
+                    'colour': color_hex
+                }]
+            }
+            requests.post(self.stoat_webhook_url, headers=headers, json=payload, timeout=10)
+        except Exception as e:
+            log.error(f"❌ Stoat REST notification error: {e}")
+
+    def _send_stoat_interactive_notification(
+        self, server_name, server_config, player_name, violation_type, content, analysis, ip_address, ban_command, name_with_ids
+    ):
+        """Send Stoat notification with text-based moderation commands"""
+        async def confirm_callback(severity: str):
+            if severity == "OK":
+                log.info(f"✅ Stoat: Toimenpide pelaajalle {player_name} valittu 'OK'")
+                await asyncio.to_thread(self._save_to_training_data, content, "OK")
+                return
+
+            if severity == "SEVERE":
+                cmd_template = ban_command if ban_command else "/banaddress {ip} 9999999 {full_name}"
+            elif severity == "MODERATE":
+                cmd_template = "/kick {index} 0"
+            elif severity == "MINOR":
+                cmd_template = "/{index} {reason}"
+                log.info(f"📝 Stoat: {player_name}: {content} (MINOR)")
+            else:
+                cmd_template = None
+
+            if cmd_template:
+                cmd = cmd_template.replace("{name}", player_name)
+                if "{reason}" in cmd:
+                    reason_msg = analysis.reason if analysis.reason else "Sääntörikkomus"
+                    cmd = cmd.replace("{reason}", reason_msg)
+                if "{full_name}" in cmd:
+                    cmd = cmd.replace("{full_name}", name_with_ids if name_with_ids else player_name)
+                if "{index}" in cmd:
+                    live_index = await asyncio.to_thread(self.get_live_player_index, player_name, server_config)
+                    cmd = cmd.replace("{index}", str(live_index) if live_index else player_name)
+                if ip_address:
+                    cmd = cmd.replace("{ip}", ip_address)
+
+                await asyncio.to_thread(self.execute_command, cmd, server_config)
+
+                if "/banaddress" in cmd:
+                    live_index = await asyncio.to_thread(self.get_live_player_index, player_name, server_config)
+                    kick_cmd = f"/kick {str(live_index) if live_index else player_name}"
+                    await asyncio.to_thread(self.execute_command, kick_cmd, server_config)
+
+            await asyncio.to_thread(self._save_to_training_data, content, severity)
+
+        async def reject_callback():
+            log.info(f"🚫 Stoat: Toimenpide pelaajalle {player_name} hylätty")
+            await asyncio.to_thread(self._save_to_training_data, content, "OK")
+
+        embed_data = {
+            'title': f"🛡️ MODEROINTIPYYNTÖ: {analysis.level}",
+            'description': f"Pelaaja **{player_name}** {'tarkastetaan (kaikki viestit)' if analysis.reason == 'Manuaalinen tarkastus (kaikki viestit)' else 'rikkoi sääntöjä.'}",
+            'color': 0xFF0000 if analysis.level == "SEVERE" else 0xFFA500 if analysis.level == "MODERATE" else 0x808080,
+            'severity': analysis.level,
+            'fields': [
+                {'name': 'Palvelin', 'value': server_name, 'inline': True},
+                {'name': 'Pelaaja', 'value': f"`{player_name}`", 'inline': True},
+                {'name': 'Tyyppi', 'value': violation_type, 'inline': True},
+                {'name': 'Sisältö', 'value': f"```{content}```", 'inline': False},
+                {'name': 'Syy', 'value': analysis.reason, 'inline': False},
+                {'name': 'Suositus', 'value': f"`{analysis.suggested_action}`", 'inline': False}
+            ]
+        }
+
+        self.stoat_bot.send_interaction(embed_data, confirm_callback, reject_callback)
+
+    def _build_notification_embed(self, server_name, player_name, violation_type, content, analysis, ip_address, ban_command) -> dict:
+        """Build a notification embed dict (shared format for both platforms)"""
+        color = {"SEVERE": 0xFF0000, "MODERATE": 0xFFA500, "MINOR": 0xFFFF00}.get(analysis.level, 0x808080)
+        title = {"SEVERE": "🚨 VAKAVA RIKKOMUS", "MODERATE": "⚠️ KESKIVAKAVA RIKKOMUS", "MINOR": "📝 LIEVÄ RIKKOMUS"}.get(analysis.level, "❓ Rikkomus")
+        fields = [
+            {"name": "Palvelin", "value": server_name, "inline": True},
+            {"name": "Pelaaja", "value": player_name, "inline": True},
+            {"name": "Tyyppi", "value": "Chat-viesti" if violation_type == "message" else "Nimimerkki", "inline": True}
+        ]
+        if ip_address: fields.append({"name": "IP-osoite", "value": f"`{ip_address}`", "inline": True})
+        fields.append({"name": "Sisältö", "value": f"```{content[:1000]}```", "inline": False})
+        fields.append({"name": "Perustelu", "value": analysis.reason, "inline": False})
+        fields.append({"name": "Ehdotettu toimenpide", "value": f"`{analysis.suggested_action}`", "inline": False})
+        if ban_command and analysis.level == "SEVERE":
+            fields.append({"name": "Ban-komento", "value": f"```{ban_command}```", "inline": False})
+        return {'title': title, 'color': color, 'fields': fields}

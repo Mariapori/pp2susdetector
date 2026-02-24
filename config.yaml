@@ -28,6 +28,12 @@ discord:
   enabled: true
   verify_all: true # Tämän voi muuttaa komennolla !verify on/off
 
+# Stoat (Revolt) -asetukset
+stoat:
+  enabled: false
+  api_url: "https://api.revolt.chat"  # tai self-hosted URL
+  ws_url: "wss://ws.revolt.chat"      # tai self-hosted WebSocket URL
+
 rules:
   severe:
     - "Epäsiveelliset nikit"
