@@ -61,7 +61,7 @@ class ActionHandler:
         self._log_violation(server_name, player_name, violation_type, content, analysis, ip_address)
         
         # Discord: Priority interaction via Bot, fallback to webhook
-        if self.discord_bot and analysis.level in ["SEVERE", "MODERATE", "MINOR"]:
+        if self.discord_enabled and self.discord_bot and analysis.level in ["SEVERE", "MODERATE", "MINOR"]:
              self._send_interactive_notification(
                 server_name, server_config, player_name, violation_type, content, analysis, ip_address, ban_command, name_with_ids
             )
