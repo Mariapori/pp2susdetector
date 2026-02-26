@@ -153,6 +153,17 @@ update_systemd_service() {
     
     print_step "Päivitetään systemd service-tiedosto..."
     
+    # Lue banlist-polut config.yaml:sta ReadWritePaths:ia varten
+    local EXTRA_RW_PATHS=""
+    if [ -f "$INSTALL_DIR/config.yaml" ]; then
+        # Kerää kaikki banlist_path-arvot ja muunna hakemistopoluiksi
+        local BANLIST_DIRS=$(grep "banlist_path:" "$INSTALL_DIR/config.yaml" | awk -F': ' '{print $2}' | tr -d '"' | tr -d "'" | tr -d '\r' | xargs -I{} dirname {} | sort -u)
+        if [ ! -z "$BANLIST_DIRS" ]; then
+            EXTRA_RW_PATHS="$BANLIST_DIRS"
+            print_step "Lisätään ReadWritePaths: $EXTRA_RW_PATHS"
+        fi
+    fi
+    
     cat > $SERVICE_FILE << EOF
 [Unit]
 Description=PP2 Suspicious Detector - Chat moderation with ML
@@ -179,7 +190,7 @@ SyslogIdentifier=$SERVICE_NAME
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=$INSTALL_DIR/data $INSTALL_DIR/logs $INSTALL_DIR/models
+ReadWritePaths=$INSTALL_DIR/data $INSTALL_DIR/logs $INSTALL_DIR/models $EXTRA_RW_PATHS
 
 [Install]
 WantedBy=multi-user.target
