@@ -133,7 +133,7 @@ class StoatBot:
 
         # Append action instructions as text
         # Quote the player name if it contains spaces
-        display_name = f'"{ player_name}"' if player_name and ' ' in player_name else player_name
+        display_name = f'"{player_name}"' if player_name and ' ' in player_name else player_name
         instructions = (
             "\n\n**Toimenpiteet:**\n"
             f"✅ `!vahvista {display_name}` — Suorita toimenpide\n"
