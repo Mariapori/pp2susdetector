@@ -134,21 +134,33 @@ class StoatBot:
         # Append action instructions as text
         # Quote the player name if it contains spaces
         display_name = f'"{player_name}"' if player_name and ' ' in player_name else player_name
+        display_server = f'"{server_name}"' if server_name and ' ' in server_name else server_name
         instructions = (
             "\n\n**Toimenpiteet:**\n"
-            f"✅ `!vahvista {display_name}` — Suorita toimenpide\n"
-            f"✅ `!vahvista {display_name} SEVERE/MODERATE/MINOR/OK` — Valitse taso\n"
-            f"❌ `!hylkaa {display_name}` — Hylkää"
+            f"✅ `!vahvista {display_name} {display_server}` — Suorita toimenpide\n"
+            f"✅ `!vahvista {display_name} SEVERE/MODERATE/MINOR/OK {display_server}` — Valitse taso\n"
+            f"❌ `!hylkaa {display_name} {display_server}` — Hylkää"
         )
 
         self.send_message(content=instructions, embeds=revolt_embeds)
 
-    def _find_pending(self, player_name: str) -> tuple:
-        """Find pending moderation by player name.
+    def _find_pending(self, player_name: str, server_name: Optional[str] = None) -> tuple:
+        """Find pending moderation by player name and optionally server.
         Returns (key, pending_dict) or (None, None) if not found.
-        If the same player is pending on multiple servers, returns the first match.
+        If server_name is given, matches exactly. Otherwise returns first match.
         """
         player_lower = player_name.lower()
+
+        # If server specified, try exact match first
+        if server_name:
+            exact_key = f"{server_name}:{player_lower}"
+            if exact_key in self._pending_moderations:
+                return exact_key, self._pending_moderations[exact_key]
+            # Try case-insensitive server match
+            for key, val in self._pending_moderations.items():
+                if key.endswith(f":{player_lower}") and val.get('server_name', '').lower() == server_name.lower():
+                    return key, val
+
         # Search all keys for matching player name
         matches = []
         for key, val in self._pending_moderations.items():
@@ -434,41 +446,52 @@ class StoatBot:
             self.send_message(f"❌ Virhe: {str(e)}", channel)
 
     async def _cmd_confirm(self, channel: str, args: str):
-        """Confirm a moderation action: !vahvista <player> [SEVERITY]"""
+        """Confirm a moderation action: !vahvista <player> [SEVERITY] [server]"""
         parsed = self._parse_command_args(args)
         if not parsed:
-            self.send_message("❌ Käyttö: `!vahvista <pelaaja> [SEVERE/MODERATE/MINOR/OK]`", channel)
+            self.send_message("❌ Käyttö: `!vahvista <pelaaja> [SEVERE/MODERATE/MINOR/OK] [palvelin]`", channel)
             return
 
+        severity_levels = {"SEVERE", "MODERATE", "MINOR", "OK"}
         player_name = parsed[0]
-        severity = parsed[1].upper() if len(parsed) > 1 else None
+        severity = None
+        server_name = None
 
-        key, pending = self._find_pending(player_name)
+        # Parse remaining args: could be [SEVERITY] [server] or just [server]
+        remaining = parsed[1:]
+        for arg in remaining:
+            if arg.upper() in severity_levels:
+                severity = arg.upper()
+            else:
+                server_name = arg
+
+        key, pending = self._find_pending(player_name, server_name)
         if not pending:
             self.send_message(f"❌ Ei odottavaa moderointia pelaajalle: **{player_name}**", channel)
             return
 
-        selected_severity = severity if severity in ["SEVERE", "MODERATE", "MINOR", "OK"] else pending['severity']
-        server_name = pending.get('server_name', '?')
+        selected_severity = severity if severity else pending['severity']
+        display_server = pending.get('server_name', '?')
 
-        self.send_message(f"⌛ Suoritetaan toimenpide tasolla: **{selected_severity}** ({server_name})...", channel)
+        self.send_message(f"⌛ Suoritetaan toimenpide tasolla: **{selected_severity}** ({display_server})...", channel)
         try:
             await pending['confirm'](selected_severity)
-            self.send_message(f"✅ Toimenpide suoritettu: **{player_name}** ({selected_severity}) — {server_name}", channel)
+            self.send_message(f"✅ Toimenpide suoritettu: **{player_name}** ({selected_severity}) — {display_server}", channel)
         except Exception as e:
             self.send_message(f"❌ Virhe: {str(e)}", channel)
         finally:
             self._pending_moderations.pop(key, None)
 
     async def _cmd_reject(self, channel: str, args: str):
-        """Reject a moderation action: !hylkaa <player>"""
+        """Reject a moderation action: !hylkaa <player> [server]"""
         parsed = self._parse_command_args(args)
         if not parsed:
-            self.send_message("❌ Käyttö: `!hylkaa <pelaaja>`", channel)
+            self.send_message("❌ Käyttö: `!hylkaa <pelaaja> [palvelin]`", channel)
             return
 
         player_name = parsed[0]
-        key, pending = self._find_pending(player_name)
+        server_name = parsed[1] if len(parsed) > 1 else None
+        key, pending = self._find_pending(player_name, server_name)
 
         if not pending:
             self.send_message(f"❌ Ei odottavaa moderointia pelaajalle: **{player_name}**", channel)
@@ -476,7 +499,7 @@ class StoatBot:
 
         try:
             await pending['reject']()
-            self.send_message(f"❌ Hylätty: **{player_name}**", channel)
+            self.send_message(f"❌ Hylätty: **{player_name}** — {pending.get('server_name', '?')}", channel)
         except Exception as e:
             self.send_message(f"❌ Virhe: {str(e)}", channel)
         finally:
