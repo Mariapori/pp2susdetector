@@ -5,6 +5,7 @@ Uses Revolt REST API directly + WebSocket for listening to commands.
 """
 
 import os
+import shlex
 import json
 import asyncio
 import threading
@@ -49,6 +50,16 @@ class StoatBot:
             "X-Bot-Token": self.token,
             "Content-Type": "application/json"
         }
+
+    def _parse_command_args(self, args: str) -> list:
+        """Parse command arguments, supporting quoted strings for names with spaces.
+        E.g. '"Kauno Semenoff" OK' -> ['Kauno Semenoff', 'OK']
+        """
+        try:
+            return shlex.split(args)
+        except ValueError:
+            # Fallback if quotes are mismatched
+            return args.strip().split()
 
     def set_command_callback(self, callback: Callable[[str], None]):
         """Set the function to call when a PP2 command needs to be executed"""
@@ -98,31 +109,61 @@ class StoatBot:
         Revolt doesn't have interactive buttons, so we append command hints.
         """
         player_name = None
+        server_name = None
         for field in embed_data.get('fields', []):
             if field.get('name') == 'Pelaaja':
                 player_name = field.get('value', '').strip('`')
-                break
+            elif field.get('name') == 'Palvelin':
+                server_name = field.get('value', '')
 
         # Store pending moderation for text-command handling
+        # Key is server:player to support multi-server
         if player_name:
-            self._pending_moderations[player_name.lower()] = {
+            key = f"{server_name or 'default'}:{player_name.lower()}"
+            self._pending_moderations[key] = {
                 'confirm': callback_confirm,
                 'reject': callback_reject,
                 'severity': embed_data.get('severity', 'MODERATE'),
-                'embed_data': embed_data
+                'embed_data': embed_data,
+                'server_name': server_name or 'default',
+                'player_name': player_name
             }
 
         revolt_embeds = self._convert_embed(embed_data)
 
         # Append action instructions as text
+        # Quote the player name if it contains spaces
+        display_name = f'"{ player_name}"' if player_name and ' ' in player_name else player_name
         instructions = (
             "\n\n**Toimenpiteet:**\n"
-            f"✅ `!vahvista {player_name}` — Suorita toimenpide\n"
-            f"✅ `!vahvista {player_name} SEVERE/MODERATE/MINOR/OK` — Valitse taso\n"
-            f"❌ `!hylkaa {player_name}` — Hylkää"
+            f"✅ `!vahvista {display_name}` — Suorita toimenpide\n"
+            f"✅ `!vahvista {display_name} SEVERE/MODERATE/MINOR/OK` — Valitse taso\n"
+            f"❌ `!hylkaa {display_name}` — Hylkää"
         )
 
         self.send_message(content=instructions, embeds=revolt_embeds)
+
+    def _find_pending(self, player_name: str) -> tuple:
+        """Find pending moderation by player name.
+        Returns (key, pending_dict) or (None, None) if not found.
+        If the same player is pending on multiple servers, returns the first match.
+        """
+        player_lower = player_name.lower()
+        # Search all keys for matching player name
+        matches = []
+        for key, val in self._pending_moderations.items():
+            # Key format: "server:player"
+            if key.endswith(f":{player_lower}"):
+                matches.append((key, val))
+
+        if len(matches) == 1:
+            return matches[0]
+        elif len(matches) > 1:
+            # Multiple servers — return first but log warning
+            servers = [m[1].get('server_name', '?') for m in matches]
+            log.warning(f"⚠️ Useita odottavia moderointeja pelaajalle {player_name}: {', '.join(servers)}. Käytetään ensimmäistä.")
+            return matches[0]
+        return None, None
 
     def _convert_embed(self, embed_data: Dict[str, Any]) -> List[dict]:
         """Convert Discord-style embed_data to Revolt embed format"""
@@ -369,7 +410,8 @@ class StoatBot:
                 self.send_message("\n".join(lines), channel)
                 return
 
-            target_name = args.strip()
+            parsed = self._parse_command_args(args)
+            target_name = parsed[0] if parsed else ""
             # Find matching player (case-insensitive)
             target = None
             for p in banned_players:
@@ -393,50 +435,52 @@ class StoatBot:
 
     async def _cmd_confirm(self, channel: str, args: str):
         """Confirm a moderation action: !vahvista <player> [SEVERITY]"""
-        parts = args.strip().split(None, 1)
-        if not parts:
+        parsed = self._parse_command_args(args)
+        if not parsed:
             self.send_message("❌ Käyttö: `!vahvista <pelaaja> [SEVERE/MODERATE/MINOR/OK]`", channel)
             return
 
-        player_name = parts[0].lower()
-        severity = parts[1].upper() if len(parts) > 1 else None
+        player_name = parsed[0]
+        severity = parsed[1].upper() if len(parsed) > 1 else None
 
-        pending = self._pending_moderations.get(player_name)
+        key, pending = self._find_pending(player_name)
         if not pending:
-            self.send_message(f"❌ Ei odottavaa moderointia pelaajalle: **{parts[0]}**", channel)
+            self.send_message(f"❌ Ei odottavaa moderointia pelaajalle: **{player_name}**", channel)
             return
 
         selected_severity = severity if severity in ["SEVERE", "MODERATE", "MINOR", "OK"] else pending['severity']
+        server_name = pending.get('server_name', '?')
 
-        self.send_message(f"⌛ Suoritetaan toimenpide tasolla: **{selected_severity}**...", channel)
+        self.send_message(f"⌛ Suoritetaan toimenpide tasolla: **{selected_severity}** ({server_name})...", channel)
         try:
             await pending['confirm'](selected_severity)
-            self.send_message(f"✅ Toimenpide suoritettu: **{parts[0]}** ({selected_severity})", channel)
+            self.send_message(f"✅ Toimenpide suoritettu: **{player_name}** ({selected_severity}) — {server_name}", channel)
         except Exception as e:
             self.send_message(f"❌ Virhe: {str(e)}", channel)
         finally:
-            self._pending_moderations.pop(player_name, None)
+            self._pending_moderations.pop(key, None)
 
     async def _cmd_reject(self, channel: str, args: str):
         """Reject a moderation action: !hylkaa <player>"""
-        if not args.strip():
+        parsed = self._parse_command_args(args)
+        if not parsed:
             self.send_message("❌ Käyttö: `!hylkaa <pelaaja>`", channel)
             return
 
-        player_name = args.strip().lower()
-        pending = self._pending_moderations.get(player_name)
+        player_name = parsed[0]
+        key, pending = self._find_pending(player_name)
 
         if not pending:
-            self.send_message(f"❌ Ei odottavaa moderointia pelaajalle: **{args.strip()}**", channel)
+            self.send_message(f"❌ Ei odottavaa moderointia pelaajalle: **{player_name}**", channel)
             return
 
         try:
             await pending['reject']()
-            self.send_message(f"❌ Hylätty: **{args.strip()}**", channel)
+            self.send_message(f"❌ Hylätty: **{player_name}**", channel)
         except Exception as e:
             self.send_message(f"❌ Virhe: {str(e)}", channel)
         finally:
-            self._pending_moderations.pop(player_name, None)
+            self._pending_moderations.pop(key, None)
 
     # ── Banlist Management (shared logic with discord_bot.py) ─────────
 
