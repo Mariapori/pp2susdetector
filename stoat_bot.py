@@ -303,6 +303,8 @@ class StoatBot:
             await self._cmd_confirm(channel, args)
         elif command == "!hylkaa":
             await self._cmd_reject(channel, args)
+        elif command == "!tasot":
+            await self._cmd_levels(channel)
 
     async def _cmd_execute(self, channel: str, cmd: str):
         """Execute a PP2 command: !c /kick 1"""
@@ -444,6 +446,21 @@ class StoatBot:
         except Exception as e:
             log.error(f"❌ Virhe !unban komennossa (Stoat): {e}")
             self.send_message(f"❌ Virhe: {str(e)}", channel)
+
+    async def _cmd_levels(self, channel: str):
+        """Show severity levels and their actions: !tasot"""
+        msg = (
+            "**📋 Vakavuustasot:**\n\n"
+            "🚨 **SEVERE** — Vakava rikkomus (vihapuhe, solvaus)\n"
+            "→ Pelaaja bannataan pysyvästi (`/banaddress`)\n\n"
+            "⚠️ **MODERATE** — Keskivakava rikkomus (kiroilu, epäkohteliaisuus)\n"
+            "→ Pelaaja potkitaan palvelimelta (`/kick`)\n\n"
+            "📝 **MINOR** — Lievä rikkomus\n"
+            "→ Pelaajalle lähetetään varoitus\n\n"
+            "✅ **OK** — Ei rikkomusta\n"
+            "→ Ei toimenpiteitä, tallennetaan opetusdataksi"
+        )
+        self.send_message(msg, channel)
 
     async def _cmd_confirm(self, channel: str, args: str):
         """Confirm a moderation action: !vahvista <player> [SEVERITY] [server]"""
