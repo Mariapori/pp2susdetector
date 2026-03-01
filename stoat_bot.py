@@ -305,6 +305,8 @@ class StoatBot:
             await self._cmd_reject(channel, args)
         elif command == "!tasot":
             await self._cmd_levels(channel)
+        elif command == "!help" or command == "!apua":
+            await self._cmd_help(channel)
 
     async def _cmd_execute(self, channel: str, cmd: str):
         """Execute a PP2 command: !c /kick 1"""
@@ -459,6 +461,51 @@ class StoatBot:
             "→ Pelaajalle lähetetään varoitus\n\n"
             "✅ **OK** — Ei rikkomusta\n"
             "→ Ei toimenpiteitä, tallennetaan opetusdataksi"
+        )
+        self.send_message(msg, channel)
+
+    async def _cmd_help(self, channel: str):
+        """Show all available commands and their usage: !help / !apua"""
+        msg = (
+            "**📖 Stoat Bot — Komennot**\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🛡️ **Moderointi**\n\n"
+            "`!vahvista <pelaaja> [TASO] [palvelin]`\n"
+            "→ Vahvistaa odottavan moderointitoimenpiteen pelaajalle.\n"
+            "→ Voit valita tason: `SEVERE`, `MODERATE`, `MINOR` tai `OK`.\n"
+            "→ Jos tasoa ei anneta, käytetään botin ehdottamaa tasoa.\n"
+            "→ Esim: `!vahvista \"Pelaajan Nimi\" SEVERE`\n\n"
+            "`!hylkaa <pelaaja> [palvelin]`\n"
+            "→ Hylkää odottavan moderointitoimenpiteen.\n"
+            "→ Esim: `!hylkaa \"Pelaajan Nimi\"`\n\n"
+            "`!tasot`\n"
+            "→ Näyttää vakavuustasot ja niiden toimenpiteet.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🔓 **Bannit**\n\n"
+            "`!unban`\n"
+            "→ Näyttää listan bannatuista pelaajista.\n\n"
+            "`!unban <pelaaja>`\n"
+            "→ Poistaa pelaajan bannin.\n"
+            "→ Esim: `!unban \"Pelaajan Nimi\"`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "⚙️ **Palvelin & Asetukset**\n\n"
+            "`!c <komento>`\n"
+            "→ Suorittaa PP2-palvelinkomennon suoraan.\n"
+            "→ Esim: `!c /kick 1` tai `!c /status`\n\n"
+            "`!verify [on/off/status]`\n"
+            "→ Hallitsee verify_all -asetusta.\n"
+            "→ `!verify on` — Kaikki viestit tarkistetaan\n"
+            "→ `!verify off` — Vain epäilyttävät viestit\n"
+            "→ `!verify status` — Näyttää nykyisen tilan\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🤖 **Muu**\n\n"
+            "`!train`\n"
+            "→ Opettaa ML-mallin uudelleen kerätyillä tiedoilla.\n\n"
+            "`!help` / `!apua`\n"
+            "→ Näyttää tämän ohjeviestin.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💡 **Vinkki:** Jos pelaajan nimessä on välilyöntejä, käytä lainausmerkkejä:\n"
+            '`!vahvista "Kauno Semenoff" SEVERE`'
         )
         self.send_message(msg, channel)
 
